@@ -29,7 +29,8 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     APP_ENVIRONMENT=production \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/opt/venv/bin:$PATH" \
+    NUMBA_CACHE_DIR=/tmp/numba_cache
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
