@@ -219,9 +219,18 @@ def setup_middleware(app: FastAPI) -> None:
     settings = get_settings()
     
     # CORS - must be first
+    # Hardcode origins for Railway deployment reliability
+    cors_origins = [
+        "https://trading-chart-analyzer.netlify.app",
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:4173",  # Vite preview
+    ]
+    
+    logger.info(f"Setting up CORS with origins: {cors_origins}")
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.security.cors_origins,
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

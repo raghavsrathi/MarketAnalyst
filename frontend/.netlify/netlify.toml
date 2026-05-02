@@ -10,6 +10,7 @@ headers = []
 publish = "D:\\Trading\\frontend\\dist"
 publishOrigin = "config"
 commandOrigin = "config"
+base = "D:\\Trading\\frontend"
 command = "npm run build"
 
 [build.environment]
