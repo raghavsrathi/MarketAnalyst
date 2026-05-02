@@ -115,9 +115,10 @@ class YahooFinanceDataFetcher(DataFetcherInterface):
                 interval=normalized_interval,
             )
         
-        # Execute fetch with retry logic
+        # Execute fetch with retry logic (run in thread pool since yfinance is blocking)
         try:
-            df = await self._fetch_with_retry(
+            df = await asyncio.to_thread(
+                self._fetch_with_retry,
                 normalized_symbol,
                 normalized_interval,
                 max_retries,
