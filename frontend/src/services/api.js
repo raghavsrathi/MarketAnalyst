@@ -26,17 +26,33 @@ export const INTERVALS = [
  * Popular symbols for quick selection
  */
 export const POPULAR_SYMBOLS = [
-  // Stocks
-  { symbol: 'AAPL', name: 'Apple Inc.', category: 'Stock' },
-  { symbol: 'MSFT', name: 'Microsoft Corp.', category: 'Stock' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.', category: 'Stock' },
-  { symbol: 'AMZN', name: 'Amazon.com Inc.', category: 'Stock' },
-  { symbol: 'TSLA', name: 'Tesla Inc.', category: 'Stock' },
-  { symbol: 'META', name: 'Meta Platforms', category: 'Stock' },
-  { symbol: 'NVDA', name: 'NVIDIA Corp.', category: 'Stock' },
-  { symbol: 'AMD', name: 'AMD Inc.', category: 'Stock' },
-  { symbol: 'NFLX', name: 'Netflix Inc.', category: 'Stock' },
+  // US Stocks
+  { symbol: 'AAPL', name: 'Apple Inc.', category: 'US Stock' },
+  { symbol: 'MSFT', name: 'Microsoft Corp.', category: 'US Stock' },
+  { symbol: 'GOOGL', name: 'Alphabet Inc.', category: 'US Stock' },
+  { symbol: 'AMZN', name: 'Amazon.com Inc.', category: 'US Stock' },
+  { symbol: 'TSLA', name: 'Tesla Inc.', category: 'US Stock' },
+  { symbol: 'META', name: 'Meta Platforms', category: 'US Stock' },
+  { symbol: 'NVDA', name: 'NVIDIA Corp.', category: 'US Stock' },
+  { symbol: 'AMD', name: 'AMD Inc.', category: 'US Stock' },
+  { symbol: 'NFLX', name: 'Netflix Inc.', category: 'US Stock' },
   { symbol: 'SPY', name: 'SPDR S&P 500 ETF', category: 'ETF' },
+  // Indian Stocks (NSE)
+  { symbol: 'RELIANCE.NS', name: 'Reliance Industries', category: 'Indian Stock' },
+  { symbol: 'TCS.NS', name: 'Tata Consultancy Services', category: 'Indian Stock' },
+  { symbol: 'INFY.NS', name: 'Infosys Ltd', category: 'Indian Stock' },
+  { symbol: 'HDFCBANK.NS', name: 'HDFC Bank', category: 'Indian Stock' },
+  { symbol: 'ICICIBANK.NS', name: 'ICICI Bank', category: 'Indian Stock' },
+  { symbol: 'SBIN.NS', name: 'State Bank of India', category: 'Indian Stock' },
+  { symbol: 'BAJFINANCE.NS', name: 'Bajaj Finance', category: 'Indian Stock' },
+  { symbol: 'BHARTIARTL.NS', name: 'Bharti Airtel', category: 'Indian Stock' },
+  { symbol: 'KOTAKBANK.NS', name: 'Kotak Mahindra Bank', category: 'Indian Stock' },
+  { symbol: 'ITC.NS', name: 'ITC Ltd', category: 'Indian Stock' },
+  { symbol: 'HINDUNILVR.NS', name: 'Hindustan Unilever', category: 'Indian Stock' },
+  { symbol: 'LT.NS', name: 'Larsen & Toubro', category: 'Indian Stock' },
+  { symbol: 'AXISBANK.NS', name: 'Axis Bank', category: 'Indian Stock' },
+  { symbol: 'MARUTI.NS', name: 'Maruti Suzuki', category: 'Indian Stock' },
+  { symbol: 'TATAMOTORS.NS', name: 'Tata Motors', category: 'Indian Stock' },
   // Crypto
   { symbol: 'BTC-USD', name: 'Bitcoin USD', category: 'Crypto' },
   { symbol: 'ETH-USD', name: 'Ethereum USD', category: 'Crypto' },

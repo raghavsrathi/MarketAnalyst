@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Clock, ChevronDown, TrendingUp, Bitcoin, Star } from 'lucide-react';
+import { Search, Clock, ChevronDown, TrendingUp, Bitcoin, Star, Globe } from 'lucide-react';
 import { INTERVALS, POPULAR_SYMBOLS } from '../services/api';
 
 const SearchBar = ({ symbol, interval, onSymbolChange, onIntervalChange, onAnalyze, isLoading }) => {
@@ -82,6 +82,10 @@ const SearchBar = ({ symbol, interval, onSymbolChange, onIntervalChange, onAnaly
         return <Bitcoin className="w-4 h-4 text-orange-400" />;
       case 'ETF':
         return <TrendingUp className="w-4 h-4 text-green-400" />;
+      case 'Indian Stock':
+        return <Globe className="w-4 h-4 text-orange-500" />;
+      case 'US Stock':
+        return <Star className="w-4 h-4 text-blue-400" />;
       default:
         return <Star className="w-4 h-4 text-blue-400" />;
     }
@@ -99,7 +103,7 @@ const SearchBar = ({ symbol, interval, onSymbolChange, onIntervalChange, onAnaly
               value={inputValue}
               onChange={handleInputChange}
               onFocus={() => setShowSymbolDropdown(true)}
-              placeholder="Enter symbol (e.g., AAPL, BTC-USD)"
+              placeholder="Enter symbol (e.g., AAPL, RELIANCE.NS, BTC-USD)"
               className="w-full pl-10 pr-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg 
                          text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 
                          focus:ring-1 focus:ring-blue-500 transition-all"

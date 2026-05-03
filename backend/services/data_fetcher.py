@@ -243,9 +243,9 @@ class YahooFinanceDataFetcher(DataFetcherInterface):
         
         normalized = symbol.strip().upper()
         
-        # Basic validation: 1-20 alphanumeric characters, hyphens allowed
+        # Basic validation: 1-20 alphanumeric characters, hyphens and dots allowed (for exchange suffixes like .NS, .BO)
         import re
-        return bool(re.match(r'^[A-Z0-9\-]{1,20}$', normalized))
+        return bool(re.match(r'^[A-Z0-9\-.]{1,25}$', normalized))
     
     def normalize_symbol(self, symbol: str) -> str:
         """
