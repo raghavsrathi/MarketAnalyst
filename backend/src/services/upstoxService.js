@@ -170,6 +170,55 @@ class UpstoxService {
       throw error;
     }
   }
+
+  // Place order
+  async placeOrder(orderParams) {
+    try {
+      const response = await axios.post(
+        `${this.baseURL}/order/place`,
+        orderParams,
+        { headers: this.getHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to place order:', error.message);
+      throw error;
+    }
+  }
+
+  // Get order status
+  async getOrderStatus(orderId) {
+    try {
+      const response = await axios.get(
+        `${this.baseURL}/order/history`,
+        {
+          headers: this.getHeaders(),
+          params: { order_id: orderId }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to get order status:', error.message);
+      throw error;
+    }
+  }
+
+  // Cancel order
+  async cancelOrder(orderId) {
+    try {
+      const response = await axios.delete(
+        `${this.baseURL}/order/cancel`,
+        {
+          headers: this.getHeaders(),
+          params: { order_id: orderId }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to cancel order:', error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = new UpstoxService();

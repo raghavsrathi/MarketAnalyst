@@ -41,27 +41,26 @@ class AnalysisService {
    */
   calculateEMA(data, period = 20) {
     const result = [...data];
+    const key = `ema${period}`;
     const multiplier = 2 / (period + 1);
-    
+
     for (let i = 0; i < result.length; i++) {
       if (i < period - 1) {
-        result[i].ema = null;
+        result[i][key] = null;
         continue;
       }
-      
+
       if (i === period - 1) {
-        // First EMA is SMA
         let sum = 0;
         for (let j = 0; j < period; j++) {
           sum += result[i - j].Close;
         }
-        result[i].ema = sum / period;
+        result[i][key] = sum / period;
       } else {
-        // EMA = Close * multiplier + EMA(prev) * (1 - multiplier)
-        result[i].ema = result[i].Close * multiplier + result[i - 1].ema * (1 - multiplier);
+        result[i][key] = result[i].Close * multiplier + result[i - 1][key] * (1 - multiplier);
       }
     }
-    
+
     return result;
   }
 
@@ -88,7 +87,7 @@ class AnalysisService {
         continue;
       }
       
-      // Average gains and losses
+      // Average gains and losses using Wilder's smoothing
       let avgGain = 0;
       let avgLoss = 0;
       
@@ -108,6 +107,117 @@ class AnalysisService {
       }
     }
     
+    return result;
+  }
+
+  /**
+   * Calculate MACD (Moving Average Convergence Divergence)
+   * @param {Array} data - Array of price data
+   * @returns {Array} Data with MACD values
+   */
+  calculateMACD(data) {
+    const result = [...data];
+    const ema12Period = 12;
+    const ema26Period = 26;
+    const signalPeriod = 9;
+    
+    // Calculate EMA12 and EMA26
+    const multiplier12 = 2 / (ema12Period + 1);
+    const multiplier26 = 2 / (ema26Period + 1);
+    const signalMultiplier = 2 / (signalPeriod + 1);
+    
+    for (let i = 0; i < result.length; i++) {
+      // EMA12
+      if (i < ema12Period - 1) {
+        result[i].ema12 = null;
+      } else if (i === ema12Period - 1) {
+        let sum = 0;
+        for (let j = 0; j < ema12Period; j++) {
+          sum += result[i - j].Close;
+        }
+        result[i].ema12 = sum / ema12Period;
+      } else {
+        result[i].ema12 = result[i].Close * multiplier12 + result[i - 1].ema12 * (1 - multiplier12);
+      }
+      
+      // EMA26
+      if (i < ema26Period - 1) {
+        result[i].ema26 = null;
+      } else if (i === ema26Period - 1) {
+        let sum = 0;
+        for (let j = 0; j < ema26Period; j++) {
+          sum += result[i - j].Close;
+        }
+        result[i].ema26 = sum / ema26Period;
+      } else {
+        result[i].ema26 = result[i].Close * multiplier26 + result[i - 1].ema26 * (1 - multiplier26);
+      }
+      
+      // MACD Line = EMA12 - EMA26
+      if (result[i].ema12 !== null && result[i].ema26 !== null) {
+        result[i].macd = result[i].ema12 - result[i].ema26;
+      } else {
+        result[i].macd = null;
+      }
+    }
+    
+    // Calculate Signal Line (EMA9 of MACD)
+    for (let i = 0; i < result.length; i++) {
+      if (i < ema26Period + signalPeriod - 2) {
+        result[i].macdSignal = null;
+      } else if (i === ema26Period + signalPeriod - 2) {
+        let sum = 0;
+        let count = 0;
+        for (let j = 0; j < signalPeriod && (i - j) >= 0; j++) {
+          if (result[i - j].macd !== null) {
+            sum += result[i - j].macd;
+            count++;
+          }
+        }
+        result[i].macdSignal = count > 0 ? sum / count : null;
+      } else {
+        result[i].macdSignal = result[i].macd * signalMultiplier + result[i - 1].macdSignal * (1 - signalMultiplier);
+      }
+      
+      // MACD Histogram = MACD - Signal
+      if (result[i].macd !== null && result[i].macdSignal !== null) {
+        result[i].macdHistogram = result[i].macd - result[i].macdSignal;
+      } else {
+        result[i].macdHistogram = null;
+      }
+    }
+    
+    return result;
+  }
+
+  calculateBollingerBands(data, period = 20, multiplier = 2) {
+    const result = [...data];
+
+    for (let i = 0; i < result.length; i++) {
+      if (i < period - 1) {
+        result[i].bbUpper = null;
+        result[i].bbMiddle = null;
+        result[i].bbLower = null;
+        continue;
+      }
+
+      let sum = 0;
+      for (let j = 0; j < period; j++) {
+        sum += result[i - j].Close;
+      }
+      const sma = sum / period;
+
+      let variance = 0;
+      for (let j = 0; j < period; j++) {
+        variance += Math.pow(result[i - j].Close - sma, 2);
+      }
+      const stdDev = Math.sqrt(variance / period);
+
+      result[i].bbMiddle = sma;
+      result[i].bbUpper = sma + (multiplier * stdDev);
+      result[i].bbLower = sma - (multiplier * stdDev);
+    }
+
     return result;
   }
 
@@ -249,10 +359,15 @@ class AnalysisService {
     logger.info(`Analyzing ${ohlcvData.length} data points`);
 
     // Calculate indicators
+    logger.info(`[Analysis] Calculating indicators for ${ohlcvData.length} data points`);
     let data = this.calculateSMA(ohlcvData, 20);
-    data = this.calculateSMA(data, 50); // For SMA50
-    data = this.calculateEMA(data, 20);
+    data = this.calculateSMA(data, 50);
+    data = this.calculateEMA(data, 9);
+    data = this.calculateEMA(data, 21);
+    data = this.calculateEMA(data, 200);
     data = this.calculateRSI(data, 14);
+    data = this.calculateMACD(data);
+    data = this.calculateBollingerBands(data, 20);
 
     // Get latest values
     const lastIdx = data.length - 1;
@@ -265,22 +380,45 @@ class AnalysisService {
     // Generate signal
     const signal = this.generateSignal(trend, lastData.rsi || 50);
 
-    // Calculate support and resistance (simple method)
+    // Calculate support and resistance
     const highs = data.slice(-20).map(d => d.High);
     const lows = data.slice(-20).map(d => d.Low);
     const resistance = Math.max(...highs);
     const support = Math.min(...lows);
 
+    // Calculate Bollinger width
+    const bbWidth = lastData.bbMiddle !== 0 
+      ? ((lastData.bbUpper - lastData.bbLower) / lastData.bbMiddle * 100)
+      : 0;
+
+    // Build nested indicators object
+    const indicators = {
+      rsi: lastData.rsi !== null ? parseFloat(lastData.rsi.toFixed(2)) : null,
+      macd: {
+        line: lastData.macd !== null ? parseFloat(lastData.macd.toFixed(2)) : null,
+        signal: lastData.macdSignal !== null ? parseFloat(lastData.macdSignal.toFixed(2)) : null,
+        histogram: lastData.macdHistogram !== null ? parseFloat(lastData.macdHistogram.toFixed(2)) : null
+      },
+      ema: {
+        ema9: lastData.ema9 !== null ? parseFloat(lastData.ema9.toFixed(2)) : null,
+        ema21: lastData.ema21 !== null ? parseFloat(lastData.ema21.toFixed(2)) : null,
+        ema200: lastData.ema200 !== null ? parseFloat(lastData.ema200.toFixed(2)) : null
+      },
+      bollinger: {
+        upper: lastData.bbUpper !== null ? parseFloat(lastData.bbUpper.toFixed(2)) : null,
+        middle: lastData.bbMiddle !== null ? parseFloat(lastData.bbMiddle.toFixed(2)) : null,
+        lower: lastData.bbLower !== null ? parseFloat(lastData.bbLower.toFixed(2)) : null,
+        width: parseFloat(bbWidth.toFixed(2))
+      }
+    };
+
+    logger.info(`[Analysis] Computed indicators:`, indicators);
+
     return {
       currentPrice: parseFloat(lastData.Close.toFixed(2)),
       change: parseFloat(((lastData.Close - prevData.Close) / prevData.Close * 100).toFixed(2)),
       volume: lastData.Volume,
-      indicators: {
-        sma20: parseFloat(lastData.sma20?.toFixed(2)) || null,
-        sma50: parseFloat(lastData.sma50?.toFixed(2)) || null,
-        ema20: parseFloat(lastData.ema?.toFixed(2)) || null,
-        rsi14: parseFloat(lastData.rsi?.toFixed(2)) || null
-      },
+      indicators,
       trend: {
         direction: trend.direction,
         strength: trend.strength,

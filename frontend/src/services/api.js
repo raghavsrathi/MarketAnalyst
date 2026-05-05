@@ -111,6 +111,7 @@ export async function fetchAnalysis(symbol, interval = '1d') {
   }
 
   const result = await response.json();
+  console.log('[api] fetchAnalysis response', result);
   
   // Handle API error responses
   if (!result.success) {
@@ -120,65 +121,77 @@ export async function fetchAnalysis(symbol, interval = '1d') {
       result
     );
   }
-  
-  // Transform backend response to match Dashboard expected format
-  if (result.data) {
-    const backendData = result.data;
-    
-    // Map nested backend fields to flat Dashboard-compatible structure
-    const transformedData = {
-      // Original backend fields
-      ...backendData,
-      
-      // Flatten nested fields for Dashboard compatibility
-      recommendation: backendData.signal?.recommendation || backendData.signal?.signal || 'HOLD',
-      confidence: backendData.signal?.confidence || 'LOW',
-      score: backendData.trend?.strength || 0,
-      
-      // Support/Resistance (from levels)
-      support: backendData.levels?.support || backendData.support,
-      resistance: backendData.levels?.resistance || backendData.resistance,
-      
-      // Trend info
-      trend: backendData.trend?.direction || backendData.trend || 'NEUTRAL',
-      trend_strength: backendData.trend?.strength || 0,
-      
-      // Indicators
-      rsi: backendData.indicators?.rsi14 || backendData.indicators?.rsi || backendData.rsi,
-      rsi_condition: backendData.indicators?.rsi14 > 70 ? 'Overbought' : 
-                      backendData.indicators?.rsi14 < 30 ? 'Oversold' : 'Neutral',
-      
-      // MACD (if available, or mock)
-      macd_signal: backendData.macd?.signal || 'NEUTRAL',
-      macd_value: backendData.macd?.value || backendData.indicators?.ema20,
-      
-      // Current price info
-      current_price: backendData.currentPrice || backendData.price,
-      price_change: backendData.change || backendData.price_change,
-      
-      // Patterns (mock or from backend)
-      patterns: backendData.patterns || [],
-      candlestick_patterns: backendData.candlestick_patterns || [],
-      
-      // Signal breakdown
-      signal_breakdown: backendData.signal?.reasons || 
-                        [backendData.trend?.direction, `RSI: ${backendData.indicators?.rsi14}`].filter(Boolean),
-      
-      // Summary
-      summary: backendData.signal?.reasons?.[0] || 
-               `${backendData.trend?.direction || 'Neutral'} trend detected`,
-      
-      // Series for chart (if backend provides it) - NORMALISED to camelCase
-      // Uses normaliseApiArray to convert PascalCase API fields to camelCase
-      candles: normaliseApiArray(backendData.candles),
-      series: normaliseApiArray(backendData.series),
-    };
-    
-    return transformedData;
+
+  const apiData = result?.data?.data ?? result?.data;
+  console.log('[api] fetchAnalysis apiData', apiData);
+
+  if (!apiData || typeof apiData !== 'object') {
+    throw new ApiError('Invalid API response format', response.status, result);
   }
-  
-  // If no success flag or no data, return null to trigger error state
-  return null;
+
+  const backendData = apiData;
+  const indicatorSummary = !Array.isArray(backendData.indicators) ? backendData.indicators : null;
+
+  const transformedData = {
+    ...backendData,
+    recommendation: backendData.signal?.recommendation || backendData.signal?.signal || 'HOLD',
+    confidence: backendData.signal?.confidence || 'LOW',
+    score: backendData.trend?.strength || 0,
+    support: backendData.levels?.support || backendData.support,
+    resistance: backendData.levels?.resistance || backendData.resistance,
+    trend: backendData.trend?.direction || backendData.trend || 'NEUTRAL',
+    trend_strength: backendData.trend?.strength || 0,
+    rsi: backendData.rsi ?? backendData.indicators?.rsi14 ?? backendData.indicators?.rsi ?? null,
+    rsi_condition: backendData.rsi_condition ??
+      (backendData.rsi ?? backendData.indicators?.rsi14 ?? backendData.indicators?.rsi) > 70 ? 'Overbought' :
+      (backendData.rsi ?? backendData.indicators?.rsi14 ?? backendData.indicators?.rsi) < 30 ? 'Oversold' : 'Neutral',
+    macd: backendData.macd ?? {
+      line: backendData.macd_line ?? backendData.indicators?.macd_line ?? null,
+      signal: backendData.macd_signal ?? backendData.indicators?.macd_signal ?? null,
+      histogram: backendData.macd_histogram ?? backendData.indicators?.macd_histogram ?? null
+    },
+    ema: backendData.ema ?? {
+      ema9: backendData.ema9 ?? backendData.indicators?.ema_short ?? null,
+      ema21: backendData.ema21 ?? backendData.indicators?.ema_long ?? null,
+      ema200: backendData.ema200 ?? backendData.indicators?.ema_200 ?? null
+    },
+    bollinger: backendData.bollinger ?? {
+      upper: backendData.bollingerUpper ?? backendData.indicators?.bb_upper ?? null,
+      middle: backendData.bollingerMiddle ?? backendData.indicators?.bb_middle ?? null,
+      lower: backendData.bollingerLower ?? backendData.indicators?.bb_lower ?? null,
+      width: backendData.bollingerWidth ?? backendData.indicators?.bb_width ?? null
+    },
+    indicators: indicatorSummary ?? {
+      rsi: backendData.rsi ?? backendData.indicators?.rsi14 ?? backendData.indicators?.rsi ?? null,
+      macd: backendData.macd ?? {
+        line: backendData.macd_line ?? backendData.indicators?.macd_line ?? null,
+        signal: backendData.macd_signal ?? backendData.indicators?.macd_signal ?? null,
+        histogram: backendData.macd_histogram ?? backendData.indicators?.macd_histogram ?? null,
+      },
+      ema: backendData.ema ?? {
+        ema9: backendData.ema9 ?? backendData.indicators?.ema_short ?? null,
+        ema21: backendData.ema21 ?? backendData.indicators?.ema_long ?? null,
+        ema200: backendData.ema200 ?? backendData.indicators?.ema_200 ?? null,
+      },
+      bollinger: backendData.bollinger ?? {
+        upper: backendData.bollingerUpper ?? backendData.indicators?.bb_upper ?? null,
+        middle: backendData.bollingerMiddle ?? backendData.indicators?.bb_middle ?? null,
+        lower: backendData.bollingerLower ?? backendData.indicators?.bb_lower ?? null,
+        width: backendData.bollingerWidth ?? backendData.indicators?.bb_width ?? null,
+      },
+    },
+    current_price: backendData.current_price ?? backendData.currentPrice ?? backendData.price,
+    price_change: backendData.price_change ?? backendData.change,
+    patterns: backendData.patterns || [],
+    candlestick_patterns: backendData.candlestick_patterns || [],
+    signal_breakdown: backendData.signal?.reasons ||
+      [backendData.trend?.direction, `RSI: ${backendData.rsi ?? backendData.indicators?.rsi14}`].filter(Boolean),
+    summary: backendData.signal?.reasons?.[0] || `${backendData.trend?.direction || 'Neutral'} trend detected`,
+    candles: normaliseApiArray(backendData.candles),
+    series: normaliseApiArray(backendData.series),
+  };
+
+  return transformedData;
 }
 
 /**
@@ -234,12 +247,17 @@ export class ApiError extends Error {
  */
 export function createLiveWebSocket(symbol, interval, onMessage, onError) {
   const wsUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://');
-  const url = `${wsUrl}/ws/live?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&refresh_seconds=30`;
+  const url = `${wsUrl}/ws/market-data`;
   
   const ws = new WebSocket(url);
   
   ws.onopen = () => {
     console.log(`WebSocket connected: ${symbol} ${interval}`);
+    // Subscribe to the symbol
+    ws.send(JSON.stringify({
+      type: 'subscribe',
+      instruments: [symbol.toUpperCase()]
+    }));
   };
   
   ws.onmessage = (event) => {
@@ -261,7 +279,7 @@ export function createLiveWebSocket(symbol, interval, onMessage, onError) {
   };
   
   ws.onclose = () => {
-    console.log('WebSocket disconnected');
+    console.log('WebSocket connection closed');
   };
   
   return ws;

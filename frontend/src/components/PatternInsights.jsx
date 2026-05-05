@@ -88,8 +88,9 @@ const PatternInsights = ({
   };
 
   const getRSIColor = () => {
-    if (rsiCondition === 'overbought') return 'text-red-400 bg-red-500/10';
-    if (rsiCondition === 'oversold') return 'text-green-400 bg-green-500/10';
+    const normalized = rsiCondition?.toString().toLowerCase();
+    if (normalized === 'overbought') return 'text-red-400 bg-red-500/10';
+    if (normalized === 'oversold') return 'text-green-400 bg-green-500/10';
     return 'text-gray-400 bg-gray-500/10';
   };
 

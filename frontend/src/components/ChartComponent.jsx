@@ -80,7 +80,8 @@ const ChartComponent = ({
   resistance,
   trend,
   symbol,
-  interval 
+  interval,
+  isLoading = false,
 }) => {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
@@ -338,6 +339,16 @@ const ChartComponent = ({
           </button>
         </div>
       </div>
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-x-0 bottom-0 top-[60px] bg-gray-900/70 backdrop-blur-sm z-10 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+            <span className="text-sm text-gray-300 font-medium">Updating...</span>
+          </div>
+        </div>
+      )}
 
       {/* Chart Container */}
       <div 

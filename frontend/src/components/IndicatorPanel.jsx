@@ -16,6 +16,9 @@ const IndicatorPanel = ({ indicators }) => {
 
   const {
     rsi,
+    macd = {},
+    ema = {},
+    bollinger = {},
     macd_line,
     macd_signal,
     macd_histogram,
@@ -27,6 +30,17 @@ const IndicatorPanel = ({ indicators }) => {
     bb_lower,
     bb_width,
   } = indicators;
+
+  const macdLine = macd?.line ?? macd_line ?? null;
+  const macdSignal = macd?.signal ?? macd_signal ?? null;
+  const macdHistogram = macd?.histogram ?? macd_histogram ?? null;
+  const emaShort = ema?.ema9 ?? ema_short ?? null;
+  const emaLong = ema?.ema21 ?? ema_long ?? null;
+  const ema200 = ema?.ema200 ?? ema_200 ?? null;
+  const bbUpper = bollinger?.upper ?? bb_upper ?? null;
+  const bbMiddle = bollinger?.middle ?? bb_middle ?? null;
+  const bbLower = bollinger?.lower ?? bb_lower ?? null;
+  const bbWidth = bollinger?.width ?? bb_width ?? null;
 
   const formatNumber = (val, decimals = 2) => {
     if (val === null || val === undefined || isNaN(val)) return '—';
@@ -64,9 +78,9 @@ const IndicatorPanel = ({ indicators }) => {
   };
 
   const rsiStatus = getRSIStatus(rsi);
-  const macdStatus = getMACDStatus(macd_line, macd_signal);
-  const bbStatus = getBBStatus(bb_width);
-  const emaTrend = getEMATrend(ema_short, ema_long);
+  const macdStatus = getMACDStatus(macdLine, macdSignal);
+  const bbStatus = getBBStatus(bbWidth);
+  const emaTrend = getEMATrend(emaShort, emaLong);
 
   const MacdIcon = macdStatus.icon;
 
@@ -127,20 +141,20 @@ const IndicatorPanel = ({ indicators }) => {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-500">Line</span>
-              <span className={`font-mono text-sm font-medium ${macd_line > macd_signal ? 'text-green-400' : 'text-gray-400'}`}>
-                {formatNumber(macd_line, 3)}
+              <span className={`font-mono text-sm font-medium ${macdLine > macdSignal ? 'text-green-400' : 'text-gray-400'}`}>
+                {formatNumber(macdLine, 3)}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-500">Signal</span>
               <span className="font-mono text-sm text-gray-400">
-                {formatNumber(macd_signal, 3)}
+                {formatNumber(macdSignal, 3)}
               </span>
             </div>
             <div className="flex items-center justify-between pt-1 border-t border-gray-700/50">
               <span className="text-xs text-gray-500">Histogram</span>
-              <span className={`font-mono text-sm font-medium ${macd_histogram > 0 ? 'text-green-400' : macd_histogram < 0 ? 'text-red-400' : 'text-gray-400'}`}>
-                {macd_histogram > 0 ? '+' : ''}{formatNumber(macd_histogram, 3)}
+              <span className={`font-mono text-sm font-medium ${macdHistogram > 0 ? 'text-green-400' : macdHistogram < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                {macdHistogram > 0 ? '+' : ''}{formatNumber(macdHistogram, 3)}
               </span>
             </div>
           </div>
@@ -164,7 +178,7 @@ const IndicatorPanel = ({ indicators }) => {
                 <span className="text-xs text-gray-500">EMA 9</span>
               </div>
               <span className="font-mono text-sm text-white">
-                {formatNumber(ema_short)}
+                {formatNumber(emaShort)}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -173,7 +187,7 @@ const IndicatorPanel = ({ indicators }) => {
                 <span className="text-xs text-gray-500">EMA 21</span>
               </div>
               <span className="font-mono text-sm text-white">
-                {formatNumber(ema_long)}
+                {formatNumber(emaLong)}
               </span>
             </div>
             <div className="flex items-center justify-between pt-1 border-t border-gray-700/50">
@@ -182,7 +196,7 @@ const IndicatorPanel = ({ indicators }) => {
                 <span className="text-xs text-gray-500">EMA 200</span>
               </div>
               <span className="font-mono text-sm text-gray-400">
-                {formatNumber(ema_200)}
+                {formatNumber(ema200)}
               </span>
             </div>
           </div>
@@ -195,7 +209,7 @@ const IndicatorPanel = ({ indicators }) => {
               <Waves className="w-4 h-4 text-pink-400" />
               <span className="text-sm font-medium text-gray-300">Bollinger Bands</span>
             </div>
-            <span className={`text-xs font-medium ${bb_width > 10 ? 'text-yellow-400' : 'text-gray-400'}`}>
+            <span className={`text-xs font-medium ${bbWidth > 10 ? 'text-yellow-400' : 'text-gray-400'}`}>
               {bbStatus.label}
             </span>
           </div>
@@ -203,31 +217,31 @@ const IndicatorPanel = ({ indicators }) => {
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-500">Upper</span>
               <span className="font-mono text-sm text-purple-400">
-                {formatNumber(bb_upper)}
+                {formatNumber(bbUpper)}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-500">Middle</span>
               <span className="font-mono text-sm text-gray-400">
-                {formatNumber(bb_middle)}
+                {formatNumber(bbMiddle)}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-500">Lower</span>
               <span className="font-mono text-sm text-purple-400">
-                {formatNumber(bb_lower)}
+                {formatNumber(bbLower)}
               </span>
             </div>
-            {bb_width !== null && (
+            {bbWidth !== null && (
               <div className="flex items-center justify-between pt-1 border-t border-gray-700/50">
                 <span className="text-xs text-gray-500">Width</span>
                 <span className="font-mono text-sm text-cyan-400">
-                  {formatNumber(bb_width, 2)}%
+                  {formatNumber(bbWidth, 2)}%
                 </span>
               </div>
             )}
           </div>
-          {bb_width !== null && (
+          {bbWidth !== null && (
             <p className="text-xs text-gray-500 mt-2">{bbStatus.desc}</p>
           )}
         </div>

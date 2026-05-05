@@ -37,7 +37,9 @@ const Dashboard = () => {
     
     try {
       const result = await fetchAnalysis(symbol, interval);
-      setData(result);
+      const apiData = result;
+      console.log('[Dashboard] apiData', apiData);
+      setData(apiData);
       setLastUpdated(new Date());
     } catch (err) {
       console.error('Analysis error:', err);
@@ -181,7 +183,7 @@ const Dashboard = () => {
         )}
 
         {/* Dashboard Content */}
-        {!loading && !error && data && (
+        {data && !error && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - Chart */}
             <div className="lg:col-span-2 space-y-6">
@@ -193,6 +195,7 @@ const Dashboard = () => {
                 trend={data.trend}
                 symbol={data.symbol}
                 interval={data.interval}
+                isLoading={loading}
               />
               
               {/* Indicator Panel - Full Width Below Chart */}

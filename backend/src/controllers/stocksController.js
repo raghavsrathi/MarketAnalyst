@@ -6,6 +6,7 @@
 
 const { Instrument } = require('../models');
 const upstoxService = require('../services/upstoxService');
+const { Op } = require('sequelize');
 const logger = require('../utils/logger');
 
 /**
