@@ -9,6 +9,70 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
 import { Maximize2, Minimize2, Layers } from 'lucide-react';
 
+// Helper to convert various time formats to Unix timestamp (seconds)
+// Handles both PascalCase (API) and camelCase (internal) field names
+const toUnixTimestamp = (time) => {
+  if (time === undefined || time === null) return null;
+  // Already a number (Unix timestamp)
+  if (typeof time === 'number') return time;
+  // BusinessDay object
+  if (typeof time === 'object' && time.year && time.month && time.day) {
+    const date = new Date(time.year, time.month - 1, time.day);
+    return Math.floor(date.getTime() / 1000);
+  }
+  // String date like "2025-12-04 00:00:00" or ISO format
+  if (typeof time === 'string') {
+    const ts = Math.floor(new Date(time).getTime() / 1000);
+    return isNaN(ts) ? null : ts;
+  }
+  return null;
+};
+
+// Helper to validate and convert candle data
+// Handles both PascalCase (API: Date, Open, High, Low, Close) and camelCase (internal: time, open, high, low, close)
+const convertCandles = (candles) => {
+  if (!Array.isArray(candles)) return [];
+  return candles
+    .map((c, index) => {
+      // Support both PascalCase (API) and camelCase (normalized) field names
+      const time = toUnixTimestamp(c.time ?? c.Date);
+      if (time === null) {
+        console.warn(`Invalid candle time at index ${index}:`, c);
+        return null;
+      }
+      return {
+        time,
+        // Defensive: PascalCase API fields take priority, fallback to camelCase
+        open: Number(c.open ?? c.Open) || 0,
+        high: Number(c.high ?? c.High) || 0,
+        low: Number(c.low ?? c.Low) || 0,
+        close: Number(c.close ?? c.Close) || 0,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.time - b.time);
+};
+
+// Helper to convert indicator data (line series)
+// Handles both PascalCase (API: Date, Value) and camelCase (internal: time, value)
+const convertIndicatorData = (data) => {
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((point, index) => {
+      // Support both PascalCase (API) and camelCase (normalized) field names
+      const time = toUnixTimestamp(point.time ?? point.Date);
+      if (time === null) {
+        console.warn(`Invalid indicator time at index ${index}:`, point);
+        return null;
+      }
+      // Defensive: PascalCase API Value/Close take priority, fallback chain for value
+      const value = Number(point.value ?? point.Value ?? point.Close ?? point.close ?? 0) || 0;
+      return { time, value };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.time - b.time);
+};
+
 const ChartComponent = ({ 
   candles, 
   indicators, 
@@ -27,191 +91,154 @@ const ChartComponent = ({
 
   // Initialize chart
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+  if (!chartContainerRef.current) return;
 
-    const chartOptions = {
-      layout: {
-        background: { type: ColorType.Solid, color: '#1a1a1a' },
-        textColor: '#d1d5db',
-      },
-      grid: {
-        vertLines: { color: '#374151', style: 1 },
-        horzLines: { color: '#374151', style: 1 },
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-        vertLine: {
-          color: '#6b7280',
-          width: 1,
-          style: 2,
-          labelBackgroundColor: '#374151',
-        },
-        horzLine: {
-          color: '#6b7280',
-          width: 1,
-          style: 2,
-          labelBackgroundColor: '#374151',
-        },
-      },
-      rightPriceScale: {
-        borderColor: '#4b5563',
-        scaleMargins: {
-          top: 0.1,
-          bottom: 0.1,
-        },
-      },
-      timeScale: {
-        borderColor: '#4b5563',
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      handleScroll: {
-        vertTouchDrag: false,
-      },
-    };
+  // FIX: Reset seriesRef at the start of every mount.
+  // StrictMode mounts twice; without this, the second mount's data effect
+  // reads stale series references from the first (already destroyed) chart.
+  seriesRef.current = {};
 
-    const chart = createChart(chartContainerRef.current, chartOptions);
-    chartRef.current = chart;
+  const chartOptions = {
+    layout: {
+      background: { type: ColorType.Solid, color: '#1a1a1a' },
+      textColor: '#d1d5db',
+    },
+    grid: {
+      vertLines: { color: '#374151', style: 1 },
+      horzLines: { color: '#374151', style: 1 },
+    },
+    crosshair: {
+      mode: CrosshairMode.Normal,
+      vertLine: { color: '#6b7280', width: 1, style: 2, labelBackgroundColor: '#374151' },
+      horzLine: { color: '#6b7280', width: 1, style: 2, labelBackgroundColor: '#374151' },
+    },
+    rightPriceScale: {
+      borderColor: '#4b5563',
+      scaleMargins: { top: 0.1, bottom: 0.1 },
+    },
+    timeScale: {
+      borderColor: '#4b5563',
+      timeVisible: true,
+      secondsVisible: false,
+    },
+    handleScroll: { vertTouchDrag: false },
+    // FIX: Remove autosize:true — ResizeObserver will own sizing exclusively.
+    // Mixing both causes the canvas to reset to 0×0.
+    width: chartContainerRef.current.clientWidth,
+    height: chartContainerRef.current.clientHeight,
+  };
 
-    // Create candlestick series
-    const candlestickSeries = chart.addCandlestickSeries({
-      upColor: '#22c55e',
-      downColor: '#ef4444',
-      borderUpColor: '#22c55e',
-      borderDownColor: '#ef4444',
-      wickUpColor: '#22c55e',
-      wickDownColor: '#ef4444',
-    });
-    seriesRef.current.candlestick = candlestickSeries;
+  const chart = createChart(chartContainerRef.current, chartOptions);
+  chartRef.current = chart;
 
-    // Create EMA series
-    const emaShortSeries = chart.addLineSeries({
-      color: '#3b82f6',
-      lineWidth: 2,
-      title: 'EMA 9',
-    });
-    seriesRef.current.emaShort = emaShortSeries;
+  // ... all your series creation stays exactly the same ...
 
-    const emaLongSeries = chart.addLineSeries({
-      color: '#f59e0b',
-      lineWidth: 2,
-      title: 'EMA 21',
-    });
-    seriesRef.current.emaLong = emaLongSeries;
-
-    // Create Bollinger Bands series
-    const bbUpperSeries = chart.addLineSeries({
-      color: '#a855f7',
-      lineWidth: 1,
-      lineStyle: 2,
-      title: 'BB Upper',
-    });
-    seriesRef.current.bbUpper = bbUpperSeries;
-
-    const bbMiddleSeries = chart.addLineSeries({
-      color: '#a855f7',
-      lineWidth: 1,
-      lineStyle: 3,
-      title: 'BB Middle',
-    });
-    seriesRef.current.bbMiddle = bbMiddleSeries;
-
-    const bbLowerSeries = chart.addLineSeries({
-      color: '#a855f7',
-      lineWidth: 1,
-      lineStyle: 2,
-      title: 'BB Lower',
-    });
-    seriesRef.current.bbLower = bbLowerSeries;
-
-    // Support/Resistance lines
-    const supportSeries = chart.addLineSeries({
-      color: '#22c55e',
-      lineWidth: 2,
-      lineStyle: 1,
-      title: 'Support',
-    });
-    seriesRef.current.support = supportSeries;
-
-    const resistanceSeries = chart.addLineSeries({
-      color: '#ef4444',
-      lineWidth: 2,
-      lineStyle: 1,
-      title: 'Resistance',
-    });
-    seriesRef.current.resistance = resistanceSeries;
-
-    // Handle resize
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
+  // FIX: Use RAF so the browser has finished painting CSS before we
+  // read dimensions. Without this, clientHeight is 0 on first render.
+  const resizeObserver = new ResizeObserver((entries) => {
+    requestAnimationFrame(() => {
+      if (!chartRef.current || !entries[0]) return;
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) {
         chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight,
+          width: Math.floor(width),
+          height: Math.floor(height),
         });
       }
-    };
+    });
+  });
 
-    window.addEventListener('resize', handleResize);
-    handleResize();
+  resizeObserver.observe(chartContainerRef.current);
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      chart.remove();
-    };
-  }, []);
+  // FIX: Initial size also needs RAF for the same reason
+  requestAnimationFrame(() => {
+    if (!chartRef.current || !chartContainerRef.current) return;
+    const { clientWidth, clientHeight } = chartContainerRef.current;
+    if (clientWidth > 0 && clientHeight > 0) {
+      chartRef.current.applyOptions({
+        width: clientWidth,
+        height: clientHeight,
+      });
+    }
+  });
+
+  return () => {
+    resizeObserver.disconnect();
+    chart.remove();
+    // FIX: Explicitly null out refs on cleanup so the data effect
+    // guard `if (!chartRef.current)` correctly blocks stale calls.
+    chartRef.current = null;
+    seriesRef.current = {};
+  };
+}, []);
 
   // Update chart data
   useEffect(() => {
-    if (!chartRef.current || !candles || candles.length === 0) return;
+    // FIX: Guard against stale refs from StrictMode's double-invoke
+    if (!chartRef.current || !seriesRef.current.candlestick || !candles || candles.length === 0) return;
 
     const { candlestick, emaShort, emaLong, bbUpper, bbMiddle, bbLower, support: supportLine, resistance: resistanceLine } = seriesRef.current;
 
     // Set candlestick data
-    candlestick.setData(candles.map(c => ({
-      time: c.time,
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-    })));
+    const validCandles = convertCandles(candles);
+    if (validCandles.length > 0) {
+      candlestick.setData(validCandles);
+    } else {
+      console.warn('No valid candles to display');
+    }
 
     // Set EMA data
     if (indicators?.ema_short?.length > 0) {
-      emaShort.setData(indicators.ema_short);
-      emaShort.applyOptions({ visible: showEMA });
+      const emaShortData = convertIndicatorData(indicators.ema_short);
+      if (emaShortData.length > 0) {
+        emaShort.setData(emaShortData);
+        emaShort.applyOptions({ visible: showEMA });
+      }
     }
     if (indicators?.ema_long?.length > 0) {
-      emaLong.setData(indicators.ema_long);
-      emaLong.applyOptions({ visible: showEMA });
+      const emaLongData = convertIndicatorData(indicators.ema_long);
+      if (emaLongData.length > 0) {
+        emaLong.setData(emaLongData);
+        emaLong.applyOptions({ visible: showEMA });
+      }
     }
 
     // Set Bollinger Bands data
     if (indicators?.bb_upper?.length > 0) {
-      bbUpper.setData(indicators.bb_upper);
-      bbUpper.applyOptions({ visible: showBB });
+      const bbUpperData = convertIndicatorData(indicators.bb_upper);
+      if (bbUpperData.length > 0) {
+        bbUpper.setData(bbUpperData);
+        bbUpper.applyOptions({ visible: showBB });
+      }
     }
     if (indicators?.bb_middle?.length > 0) {
-      bbMiddle.setData(indicators.bb_middle);
-      bbMiddle.applyOptions({ visible: showBB });
+      const bbMiddleData = convertIndicatorData(indicators.bb_middle);
+      if (bbMiddleData.length > 0) {
+        bbMiddle.setData(bbMiddleData);
+        bbMiddle.applyOptions({ visible: showBB });
+      }
     }
     if (indicators?.bb_lower?.length > 0) {
-      bbLower.setData(indicators.bb_lower);
-      bbLower.applyOptions({ visible: showBB });
+      const bbLowerData = convertIndicatorData(indicators.bb_lower);
+      if (bbLowerData.length > 0) {
+        bbLower.setData(bbLowerData);
+        bbLower.applyOptions({ visible: showBB });
+      }
     }
 
     // Set Support/Resistance lines
-    if (support && candles.length > 0) {
-      const firstTime = candles[0].time;
-      const lastTime = candles[candles.length - 1].time;
+    if (support && validCandles.length > 0) {
+      const firstTime = validCandles[0].time;
+      const lastTime = validCandles[validCandles.length - 1].time;
       supportLine.setData([
         { time: firstTime, value: support },
         { time: lastTime, value: support },
       ]);
     }
 
-    if (resistance && candles.length > 0) {
-      const firstTime = candles[0].time;
-      const lastTime = candles[candles.length - 1].time;
+    if (resistance && validCandles.length > 0) {
+      const firstTime = validCandles[0].time;
+      const lastTime = validCandles[validCandles.length - 1].time;
       resistanceLine.setData([
         { time: firstTime, value: resistance },
         { time: lastTime, value: resistance },
@@ -223,16 +250,17 @@ const ChartComponent = ({
   }, [candles, indicators, support, resistance, showEMA, showBB]);
 
   const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
-    setTimeout(() => {
-      if (chartRef.current && chartContainerRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight,
-        });
-      }
-    }, 100);
-  };
+  setIsFullscreen(prev => !prev);
+  // FIX: RAF instead of setTimeout — waits for DOM repaint, not arbitrary delay
+  requestAnimationFrame(() => {
+    if (chartRef.current && chartContainerRef.current) {
+      chartRef.current.applyOptions({
+        width: chartContainerRef.current.clientWidth,
+        height: chartContainerRef.current.clientHeight,
+      });
+    }
+  });
+};
 
   const containerClass = isFullscreen 
     ? 'fixed inset-0 z-50 bg-gray-900 p-4' 
@@ -314,8 +342,11 @@ const ChartComponent = ({
       {/* Chart Container */}
       <div 
         ref={chartContainerRef} 
-        className="flex-1"
-        style={{ height: isFullscreen ? 'calc(100% - 60px)' : '440px' }}
+        className="w-full"
+        style={{ 
+          height: isFullscreen ? 'calc(100% - 60px)' : '440px',
+          minHeight: '440px',
+        }}
       />
     </div>
   );

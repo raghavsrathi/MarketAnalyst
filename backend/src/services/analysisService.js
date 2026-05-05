@@ -1,0 +1,301 @@
+/**
+ * Technical Analysis Service
+ * ------------------------
+ * Calculates indicators: SMA, EMA, RSI, Trend Detection
+ */
+
+const logger = require('../utils/logger');
+
+class AnalysisService {
+  /**
+   * Calculate Simple Moving Average
+   * @param {Array} data - Array of price data with 'Close' field
+   * @param {number} period - SMA period
+   * @returns {Array} Data with SMA values
+   */
+  calculateSMA(data, period = 20) {
+    const result = [...data];
+    const key = `sma${period}`; // e.g. sma20, sma50
+    
+    for (let i = 0; i < result.length; i++) {
+      if (i < period - 1) {
+        result[i][key] = null;
+        continue;
+      }
+      
+      let sum = 0;
+      for (let j = 0; j < period; j++) {
+        sum += result[i - j].Close;
+      }
+      result[i][key] = sum / period;
+    }
+    
+    return result;
+  }
+
+  /**
+   * Calculate Exponential Moving Average
+   * @param {Array} data - Array of price data
+   * @param {number} period - EMA period
+   * @returns {Array} Data with EMA values
+   */
+  calculateEMA(data, period = 20) {
+    const result = [...data];
+    const multiplier = 2 / (period + 1);
+    
+    for (let i = 0; i < result.length; i++) {
+      if (i < period - 1) {
+        result[i].ema = null;
+        continue;
+      }
+      
+      if (i === period - 1) {
+        // First EMA is SMA
+        let sum = 0;
+        for (let j = 0; j < period; j++) {
+          sum += result[i - j].Close;
+        }
+        result[i].ema = sum / period;
+      } else {
+        // EMA = Close * multiplier + EMA(prev) * (1 - multiplier)
+        result[i].ema = result[i].Close * multiplier + result[i - 1].ema * (1 - multiplier);
+      }
+    }
+    
+    return result;
+  }
+
+  /**
+   * Calculate Relative Strength Index (RSI)
+   * @param {Array} data - Array of price data
+   * @param {number} period - RSI period (default 14)
+   * @returns {Array} Data with RSI values
+   */
+  calculateRSI(data, period = 14) {
+    const result = [...data];
+    
+    // Calculate price changes
+    for (let i = 1; i < result.length; i++) {
+      result[i].change = result[i].Close - result[i - 1].Close;
+      result[i].gain = result[i].change > 0 ? result[i].change : 0;
+      result[i].loss = result[i].change < 0 ? Math.abs(result[i].change) : 0;
+    }
+    
+    // Calculate RSI
+    for (let i = 0; i < result.length; i++) {
+      if (i < period) {
+        result[i].rsi = null;
+        continue;
+      }
+      
+      // Average gains and losses
+      let avgGain = 0;
+      let avgLoss = 0;
+      
+      for (let j = 0; j < period; j++) {
+        avgGain += result[i - j].gain || 0;
+        avgLoss += result[i - j].loss || 0;
+      }
+      
+      avgGain /= period;
+      avgLoss /= period;
+      
+      if (avgLoss === 0) {
+        result[i].rsi = 100;
+      } else {
+        const rs = avgGain / avgLoss;
+        result[i].rsi = 100 - (100 / (1 + rs));
+      }
+    }
+    
+    return result;
+  }
+
+  /**
+   * Detect trend based on moving averages
+   * @param {Array} data - Data with SMA values
+   * @returns {Object} Trend information
+   */
+  detectTrend(data) {
+    if (data.length < 50) {
+      return { direction: 'UNKNOWN', strength: 0 };
+    }
+
+    const lastIdx = data.length - 1;
+    const current = data[lastIdx];
+    const prev20 = data[lastIdx - 20] || current;
+    
+    const sma20 = current.sma20;
+    const sma50 = current.sma50;
+    const price = current.Close;
+    
+    if (!sma20 || !sma50) {
+      return { direction: 'UNKNOWN', strength: 0 };
+    }
+
+    // Determine trend
+    let direction = 'NEUTRAL';
+    let strength = 0;
+
+    // Strong bullish: Price > SMA20 > SMA50
+    if (price > sma20 && sma20 > sma50) {
+      direction = 'BULLISH';
+      strength = (price - sma50) / sma50 * 100; // % above SMA50
+    }
+    // Strong bearish: Price < SMA20 < SMA50
+    else if (price < sma20 && sma20 < sma50) {
+      direction = 'BEARISH';
+      strength = (sma50 - price) / sma50 * 100; // % below SMA50
+    }
+    // Weak bullish: Price > SMA50
+    else if (price > sma50) {
+      direction = 'WEAK_BULLISH';
+      strength = (price - sma50) / sma50 * 100;
+    }
+    // Weak bearish: Price < SMA50
+    else if (price < sma50) {
+      direction = 'WEAK_BEARISH';
+      strength = (sma50 - price) / sma50 * 100;
+    }
+
+    // Cap strength at 10%
+    strength = Math.min(strength, 10);
+
+    return {
+      direction,
+      strength: parseFloat(strength.toFixed(2)),
+      sma20: parseFloat(sma20.toFixed(2)),
+      sma50: parseFloat(sma50.toFixed(2)),
+      price: parseFloat(price.toFixed(2))
+    };
+  }
+
+  /**
+   * Generate trading signal based on analysis
+   * @param {Object} trend - Trend analysis
+   * @param {number} rsi - Current RSI value
+   * @returns {Object} Trading signal
+   */
+  generateSignal(trend, rsi) {
+    let recommendation = 'HOLD';
+    let confidence = 'LOW';
+    let reasons = [];
+
+    // RSI-based signals
+    if (rsi < 30) {
+      reasons.push('RSI oversold (<30)');
+      if (trend.direction.includes('BULLISH')) {
+        recommendation = 'BUY';
+        confidence = 'HIGH';
+        reasons.push('Oversold in uptrend - potential reversal');
+      } else if (trend.direction === 'BEARISH') {
+        recommendation = 'HOLD';
+        confidence = 'MEDIUM';
+        reasons.push('Oversold but strong downtrend - wait for confirmation');
+      } else {
+        recommendation = 'BUY';
+        confidence = 'MEDIUM';
+      }
+    } else if (rsi > 70) {
+      reasons.push('RSI overbought (>70)');
+      if (trend.direction.includes('BEARISH')) {
+        recommendation = 'SELL';
+        confidence = 'HIGH';
+        reasons.push('Overbought in downtrend - potential reversal');
+      } else if (trend.direction === 'BULLISH') {
+        recommendation = 'HOLD';
+        confidence = 'MEDIUM';
+        reasons.push('Overbought but strong uptrend - avoid shorting');
+      } else {
+        recommendation = 'SELL';
+        confidence = 'MEDIUM';
+      }
+    } else {
+      reasons.push(`RSI neutral (${rsi.toFixed(1)})`);
+    }
+
+    // Trend-based signals
+    if (trend.direction === 'BULLISH' && rsi > 40 && rsi < 70) {
+      recommendation = 'BUY';
+      confidence = trend.strength > 5 ? 'HIGH' : 'MEDIUM';
+      reasons.push(`Strong uptrend (${trend.strength.toFixed(1)}% above SMA50)`);
+    } else if (trend.direction === 'BEARISH' && rsi < 60 && rsi > 30) {
+      recommendation = 'SELL';
+      confidence = trend.strength > 5 ? 'HIGH' : 'MEDIUM';
+      reasons.push(`Strong downtrend (${trend.strength.toFixed(1)}% below SMA50)`);
+    } else if (trend.direction.includes('BULLISH')) {
+      reasons.push(`Uptrend detected (${trend.direction})`);
+    } else if (trend.direction.includes('BEARISH')) {
+      reasons.push(`Downtrend detected (${trend.direction})`);
+    }
+
+    return {
+      recommendation,
+      confidence,
+      reasons
+    };
+  }
+
+  /**
+   * Perform complete technical analysis
+   * @param {Array} ohlcvData - Array of OHLCV data
+   * @returns {Object} Complete analysis result
+   */
+  analyze(ohlcvData) {
+    if (!ohlcvData || ohlcvData.length < 50) {
+      throw new Error('Insufficient data for analysis. Need at least 50 data points.');
+    }
+
+    logger.info(`Analyzing ${ohlcvData.length} data points`);
+
+    // Calculate indicators
+    let data = this.calculateSMA(ohlcvData, 20);
+    data = this.calculateSMA(data, 50); // For SMA50
+    data = this.calculateEMA(data, 20);
+    data = this.calculateRSI(data, 14);
+
+    // Get latest values
+    const lastIdx = data.length - 1;
+    const lastData = data[lastIdx];
+    const prevData = data[lastIdx - 1] || lastData;
+
+    // Detect trend
+    const trend = this.detectTrend(data);
+
+    // Generate signal
+    const signal = this.generateSignal(trend, lastData.rsi || 50);
+
+    // Calculate support and resistance (simple method)
+    const highs = data.slice(-20).map(d => d.High);
+    const lows = data.slice(-20).map(d => d.Low);
+    const resistance = Math.max(...highs);
+    const support = Math.min(...lows);
+
+    return {
+      currentPrice: parseFloat(lastData.Close.toFixed(2)),
+      change: parseFloat(((lastData.Close - prevData.Close) / prevData.Close * 100).toFixed(2)),
+      volume: lastData.Volume,
+      indicators: {
+        sma20: parseFloat(lastData.sma20?.toFixed(2)) || null,
+        sma50: parseFloat(lastData.sma50?.toFixed(2)) || null,
+        ema20: parseFloat(lastData.ema?.toFixed(2)) || null,
+        rsi14: parseFloat(lastData.rsi?.toFixed(2)) || null
+      },
+      trend: {
+        direction: trend.direction,
+        strength: trend.strength,
+        sma20: trend.sma20,
+        sma50: trend.sma50
+      },
+      levels: {
+        support: parseFloat(support.toFixed(2)),
+        resistance: parseFloat(resistance.toFixed(2))
+      },
+      signal,
+      lastUpdated: new Date().toISOString(),
+      dataPoints: data.length
+    };
+  }
+}
+
+module.exports = new AnalysisService();

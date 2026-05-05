@@ -5,7 +5,51 @@
  * Handles fetching analysis data and error handling.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://theanalyst-production.up.railway.app';
+// Backend API URL - defaults to local backend on port 8080
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+/**
+ * NORMALISATION UTILITY
+ * ---------------------
+ * Maps PascalCase API keys to camelCase at the data-fetch boundary.
+ * This ensures the rest of the app always works with camelCase fields.
+ * 
+ * @param {Object} record - Raw API record (e.g., candle with Date, Open, High, Low, Close)
+ * @returns {Object} Normalized record with camelCase keys (time, open, high, low, close)
+ */
+export function normaliseApiRecord(record) {
+  if (!record || typeof record !== 'object') return record;
+  
+  return {
+    // Time field: API uses 'Date', we use 'time'
+    time: record.Date ?? record.time,
+    
+    // OHLC fields: API uses PascalCase, we use camelCase
+    open: record.Open ?? record.open,
+    high: record.High ?? record.high,
+    low: record.Low ?? record.low,
+    close: record.Close ?? record.close,
+    
+    // Volume: API uses 'Volume', we use 'volume'
+    volume: record.Volume ?? record.volume,
+    
+    // Indicator value fields
+    value: record.Value ?? record.value ?? record.Close ?? record.close,
+    
+    // Preserve any other fields that may exist
+    ...record,
+  };
+}
+
+/**
+ * Helper to normalise an array of API records (e.g., candles, indicator series)
+ * @param {Array} data - Array of raw API records
+ * @returns {Array} Array of normalized records
+ */
+export function normaliseApiArray(data) {
+  if (!Array.isArray(data)) return [];
+  return data.map(normaliseApiRecord);
+}
 
 /**
  * Supported timeframe intervals
@@ -26,17 +70,6 @@ export const INTERVALS = [
  * Popular symbols for quick selection
  */
 export const POPULAR_SYMBOLS = [
-  // US Stocks
-  { symbol: 'AAPL', name: 'Apple Inc.', category: 'US Stock' },
-  { symbol: 'MSFT', name: 'Microsoft Corp.', category: 'US Stock' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.', category: 'US Stock' },
-  { symbol: 'AMZN', name: 'Amazon.com Inc.', category: 'US Stock' },
-  { symbol: 'TSLA', name: 'Tesla Inc.', category: 'US Stock' },
-  { symbol: 'META', name: 'Meta Platforms', category: 'US Stock' },
-  { symbol: 'NVDA', name: 'NVIDIA Corp.', category: 'US Stock' },
-  { symbol: 'AMD', name: 'AMD Inc.', category: 'US Stock' },
-  { symbol: 'NFLX', name: 'Netflix Inc.', category: 'US Stock' },
-  { symbol: 'SPY', name: 'SPDR S&P 500 ETF', category: 'ETF' },
   // Indian Stocks (NSE)
   { symbol: 'RELIANCE.NS', name: 'Reliance Industries', category: 'Indian Stock' },
   { symbol: 'TCS.NS', name: 'Tata Consultancy Services', category: 'Indian Stock' },
@@ -53,22 +86,13 @@ export const POPULAR_SYMBOLS = [
   { symbol: 'AXISBANK.NS', name: 'Axis Bank', category: 'Indian Stock' },
   { symbol: 'MARUTI.NS', name: 'Maruti Suzuki', category: 'Indian Stock' },
   { symbol: 'TATAMOTORS.NS', name: 'Tata Motors', category: 'Indian Stock' },
-  // Crypto
-  { symbol: 'BTC-USD', name: 'Bitcoin USD', category: 'Crypto' },
-  { symbol: 'ETH-USD', name: 'Ethereum USD', category: 'Crypto' },
-  { symbol: 'SOL-USD', name: 'Solana USD', category: 'Crypto' },
-  { symbol: 'ADA-USD', name: 'Cardano USD', category: 'Crypto' },
-  { symbol: 'DOT-USD', name: 'Polkadot USD', category: 'Crypto' },
-  { symbol: 'MATIC-USD', name: 'Polygon USD', category: 'Crypto' },
-  { symbol: 'AVAX-USD', name: 'Avalanche USD', category: 'Crypto' },
-  { symbol: 'LINK-USD', name: 'Chainlink USD', category: 'Crypto' },
 ];
 
 /**
  * Fetch full technical analysis for a symbol and interval
  * @param {string} symbol - Stock/crypto symbol (e.g., 'AAPL', 'BTC-USD')
  * @param {string} interval - Timeframe interval (e.g., '1d', '1h')
- * @returns {Promise<Object>} Analysis data from the API
+ * @returns {Promise<Object>} Analysis data from the API (transformed for Dashboard)
  */
 export async function fetchAnalysis(symbol, interval = '1d') {
   const url = new URL(`${API_BASE_URL}/analyze`);
@@ -86,7 +110,75 @@ export async function fetchAnalysis(symbol, interval = '1d') {
     );
   }
 
-  return response.json();
+  const result = await response.json();
+  
+  // Handle API error responses
+  if (!result.success) {
+    throw new ApiError(
+      result.error || 'Analysis failed',
+      response.status,
+      result
+    );
+  }
+  
+  // Transform backend response to match Dashboard expected format
+  if (result.data) {
+    const backendData = result.data;
+    
+    // Map nested backend fields to flat Dashboard-compatible structure
+    const transformedData = {
+      // Original backend fields
+      ...backendData,
+      
+      // Flatten nested fields for Dashboard compatibility
+      recommendation: backendData.signal?.recommendation || backendData.signal?.signal || 'HOLD',
+      confidence: backendData.signal?.confidence || 'LOW',
+      score: backendData.trend?.strength || 0,
+      
+      // Support/Resistance (from levels)
+      support: backendData.levels?.support || backendData.support,
+      resistance: backendData.levels?.resistance || backendData.resistance,
+      
+      // Trend info
+      trend: backendData.trend?.direction || backendData.trend || 'NEUTRAL',
+      trend_strength: backendData.trend?.strength || 0,
+      
+      // Indicators
+      rsi: backendData.indicators?.rsi14 || backendData.indicators?.rsi || backendData.rsi,
+      rsi_condition: backendData.indicators?.rsi14 > 70 ? 'Overbought' : 
+                      backendData.indicators?.rsi14 < 30 ? 'Oversold' : 'Neutral',
+      
+      // MACD (if available, or mock)
+      macd_signal: backendData.macd?.signal || 'NEUTRAL',
+      macd_value: backendData.macd?.value || backendData.indicators?.ema20,
+      
+      // Current price info
+      current_price: backendData.currentPrice || backendData.price,
+      price_change: backendData.change || backendData.price_change,
+      
+      // Patterns (mock or from backend)
+      patterns: backendData.patterns || [],
+      candlestick_patterns: backendData.candlestick_patterns || [],
+      
+      // Signal breakdown
+      signal_breakdown: backendData.signal?.reasons || 
+                        [backendData.trend?.direction, `RSI: ${backendData.indicators?.rsi14}`].filter(Boolean),
+      
+      // Summary
+      summary: backendData.signal?.reasons?.[0] || 
+               `${backendData.trend?.direction || 'Neutral'} trend detected`,
+      
+      // Series for chart (if backend provides it) - NORMALISED to camelCase
+      // Uses normaliseApiArray to convert PascalCase API fields to camelCase
+      candles: normaliseApiArray(backendData.candles),
+      series: normaliseApiArray(backendData.series),
+    };
+    
+    return transformedData;
+  }
+  
+  // If no success flag or no data, return null to trigger error state
+  return null;
 }
 
 /**

@@ -19,7 +19,7 @@ import { fetchAnalysis, createLiveWebSocket } from '../services/api';
 
 const Dashboard = () => {
   // State
-  const [symbol, setSymbol] = useState('AAPL');
+  const [symbol, setSymbol] = useState('RELIANCE.NS');
   const [interval, setInterval] = useState('1d');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);

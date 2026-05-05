@@ -103,7 +103,7 @@ const SearchBar = ({ symbol, interval, onSymbolChange, onIntervalChange, onAnaly
               value={inputValue}
               onChange={handleInputChange}
               onFocus={() => setShowSymbolDropdown(true)}
-              placeholder="Enter symbol (e.g., AAPL, RELIANCE.NS, BTC-USD)"
+              placeholder="Enter symbol (e.g. RELIANCE.NS)"
               className="w-full pl-10 pr-4 py-3 bg-gray-900/50 border border-gray-600 rounded-lg 
                          text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 
                          focus:ring-1 focus:ring-blue-500 transition-all"
