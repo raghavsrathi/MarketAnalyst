@@ -14,7 +14,13 @@ import { Maximize2, Minimize2, Layers } from 'lucide-react';
 const toUnixTimestamp = (time) => {
   if (time === undefined || time === null) return null;
   // Already a number (Unix timestamp)
-  if (typeof time === 'number') return time;
+  if (typeof time === 'number') {
+  // If already in seconds, return directly
+  if (time < 1e12) return time;
+
+  // If milliseconds, convert
+  return Math.floor(time / 1000);
+}
   // BusinessDay object
   if (typeof time === 'object' && time.year && time.month && time.day) {
     const date = new Date(time.year, time.month - 1, time.day);
@@ -132,10 +138,75 @@ const ChartComponent = ({
   const chart = createChart(chartContainerRef.current, chartOptions);
   chartRef.current = chart;
 
-  // ... all your series creation stays exactly the same ...
+  const candlestickSeries = chart.addCandlestickSeries({
+      upColor: '#22c55e',
+      downColor: '#ef4444',
+      borderUpColor: '#22c55e',
+      borderDownColor: '#ef4444',
+      wickUpColor: '#22c55e',
+      wickDownColor: '#ef4444',
+    });
 
-  // FIX: Use RAF so the browser has finished painting CSS before we
-  // read dimensions. Without this, clientHeight is 0 on first render.
+    seriesRef.current.candlestick = candlestickSeries;
+
+   // Create EMA series
+    const emaShortSeries = chart.addLineSeries({
+      color: '#3b82f6',
+      lineWidth: 2,
+      title: 'EMA 9',
+    });
+    seriesRef.current.emaShort = emaShortSeries;
+
+    const emaLongSeries = chart.addLineSeries({
+      color: '#f59e0b',
+      lineWidth: 2,
+      title: 'EMA 21',
+    });
+    seriesRef.current.emaLong = emaLongSeries;
+
+    // Create Bollinger Bands series
+    const bbUpperSeries = chart.addLineSeries({
+      color: '#a855f7',
+      lineWidth: 1,
+      lineStyle: 2,
+      title: 'BB Upper',
+    });
+    seriesRef.current.bbUpper = bbUpperSeries;
+
+    const bbMiddleSeries = chart.addLineSeries({
+      color: '#a855f7',
+      lineWidth: 1,
+      lineStyle: 3,
+      title: 'BB Middle',
+    });
+    seriesRef.current.bbMiddle = bbMiddleSeries;
+
+    const bbLowerSeries = chart.addLineSeries({
+      color: '#a855f7',
+      lineWidth: 1,
+      lineStyle: 2,
+      title: 'BB Lower', 
+    });
+    seriesRef.current.bbLower = bbLowerSeries;
+
+
+    // Support/Resistance lines
+    const supportSeries = chart.addLineSeries({
+      color: '#22c55e',
+      lineWidth: 2,
+      lineStyle: 1,
+      title: 'Support',
+    });
+    seriesRef.current.support = supportSeries;
+
+    const resistanceSeries = chart.addLineSeries({
+      color: '#ef4444',
+      lineWidth: 2,
+      lineStyle: 1,
+      title: 'Resistance',
+    });
+    seriesRef.current.resistance = resistanceSeries;
+
   const resizeObserver = new ResizeObserver((entries) => {
     requestAnimationFrame(() => {
       if (!chartRef.current || !entries[0]) return;
@@ -175,57 +246,94 @@ const ChartComponent = ({
 
   // Update chart data
   useEffect(() => {
+    console.log('Chart Data:', { candles, indicators });
     // FIX: Guard against stale refs from StrictMode's double-invoke
     if (!chartRef.current || !seriesRef.current.candlestick || !candles || candles.length === 0) return;
 
     const { candlestick, emaShort, emaLong, bbUpper, bbMiddle, bbLower, support: supportLine, resistance: resistanceLine } = seriesRef.current;
 
     // Set candlestick data
+    console.log('Incoming candles:', candles.slice(0, 2));
     const validCandles = convertCandles(candles);
     if (validCandles.length > 0) {
       candlestick.setData(validCandles);
     } else {
       console.warn('No valid candles to display');
     }
+    console.log('Converted candles:', validCandles.slice(0, 2));
+
+    const lastCandleTime = validCandles.length > 0 ? validCandles[validCandles.length - 1].time : null;
+    const buildPointSeries = (value) => {
+      return lastCandleTime != null && value != null ? [{ time: lastCandleTime, value }] : [];
+    };
 
     // Set EMA data
-    if (indicators?.ema_short?.length > 0) {
-      const emaShortData = convertIndicatorData(indicators.ema_short);
-      if (emaShortData.length > 0) {
-        emaShort.setData(emaShortData);
-        emaShort.applyOptions({ visible: showEMA });
-      }
+    const emaShortSource = Array.isArray(indicators?.ema_short)
+      ? indicators.ema_short
+      : buildPointSeries(indicators?.ema?.ema9 ?? indicators?.ema9 ?? indicators?.ema_short?.[0]?.value);
+    const emaLongSource = Array.isArray(indicators?.ema_long)
+      ? indicators.ema_long
+      : buildPointSeries(indicators?.ema?.ema21 ?? indicators?.ema21 ?? indicators?.ema_long?.[0]?.value);
+
+    const emaShortData = convertIndicatorData(emaShortSource);
+    if (emaShortData.length > 0) {
+      emaShort.setData(emaShortData);
+      emaShort.applyOptions({ visible: showEMA });
     }
-    if (indicators?.ema_long?.length > 0) {
-      const emaLongData = convertIndicatorData(indicators.ema_long);
-      if (emaLongData.length > 0) {
-        emaLong.setData(emaLongData);
-        emaLong.applyOptions({ visible: showEMA });
-      }
+
+    const emaLongData = convertIndicatorData(emaLongSource);
+    if (emaLongData.length > 0) {
+      emaLong.setData(emaLongData);
+      emaLong.applyOptions({ visible: showEMA });
     }
 
     // Set Bollinger Bands data
-    if (indicators?.bb_upper?.length > 0) {
-      const bbUpperData = convertIndicatorData(indicators.bb_upper);
-      if (bbUpperData.length > 0) {
-        bbUpper.setData(bbUpperData);
-        bbUpper.applyOptions({ visible: showBB });
-      }
+    const bbUpperSource = Array.isArray(indicators?.bb_upper)
+      ? indicators.bb_upper
+      : buildPointSeries(indicators?.bollinger?.upper ?? indicators?.bb_upper);
+    const bbMiddleSource = Array.isArray(indicators?.bb_middle)
+      ? indicators.bb_middle
+      : buildPointSeries(indicators?.bollinger?.middle ?? indicators?.bb_middle);
+    const bbLowerSource = Array.isArray(indicators?.bb_lower)
+      ? indicators.bb_lower
+      : buildPointSeries(indicators?.bollinger?.lower ?? indicators?.bb_lower);
+
+    const bbUpperData = convertIndicatorData(bbUpperSource);
+    const bbMiddleData = convertIndicatorData(bbMiddleSource);
+    const bbLowerData = convertIndicatorData(bbLowerSource);
+
+    if (bbUpperData.length > 0) {
+      bbUpper.setData(bbUpperData);
+      bbUpper.applyOptions({ visible: showBB });
     }
-    if (indicators?.bb_middle?.length > 0) {
-      const bbMiddleData = convertIndicatorData(indicators.bb_middle);
-      if (bbMiddleData.length > 0) {
-        bbMiddle.setData(bbMiddleData);
-        bbMiddle.applyOptions({ visible: showBB });
-      }
+    if (bbMiddleData.length > 0) {
+      bbMiddle.setData(bbMiddleData);
+      bbMiddle.applyOptions({ visible: showBB });
     }
-    if (indicators?.bb_lower?.length > 0) {
-      const bbLowerData = convertIndicatorData(indicators.bb_lower);
-      if (bbLowerData.length > 0) {
-        bbLower.setData(bbLowerData);
-        bbLower.applyOptions({ visible: showBB });
-      }
+    if (bbLowerData.length > 0) {
+      bbLower.setData(bbLowerData);
+      bbLower.applyOptions({ visible: showBB });
     }
+
+    console.log('Bollinger:', {
+      upper: bbUpperData,
+      middle: bbMiddleData,
+      lower: bbLowerData,
+    });
+    // if (indicators?.bb_middle?.length > 0) {
+    //   const bbMiddleData = convertIndicatorData(indicators.bb_middle);
+    //   if (bbMiddleData.length > 0) {
+    //     bbMiddle.setData(bbMiddleData);
+    //     bbMiddle.applyOptions({ visible: showBB });
+    //   }
+    // }
+    // if (indicators?.bb_lower?.length > 0) {
+    //   const bbLowerData = convertIndicatorData(indicators.bb_lower);
+    //   if (bbLowerData.length > 0) {
+    //     bbLower.setData(bbLowerData);
+    //     bbLower.applyOptions({ visible: showBB });
+    //   }
+    // }
 
     // Set Support/Resistance lines
     if (support && validCandles.length > 0) {

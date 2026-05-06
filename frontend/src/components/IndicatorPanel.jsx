@@ -31,16 +31,24 @@ const IndicatorPanel = ({ indicators }) => {
     bb_width,
   } = indicators;
 
-  const macdLine = macd?.line ?? macd_line ?? null;
-  const macdSignal = macd?.signal ?? macd_signal ?? null;
-  const macdHistogram = macd?.histogram ?? macd_histogram ?? null;
-  const emaShort = ema?.ema9 ?? ema_short ?? null;
-  const emaLong = ema?.ema21 ?? ema_long ?? null;
-  const ema200 = ema?.ema200 ?? ema_200 ?? null;
-  const bbUpper = bollinger?.upper ?? bb_upper ?? null;
-  const bbMiddle = bollinger?.middle ?? bb_middle ?? null;
-  const bbLower = bollinger?.lower ?? bb_lower ?? null;
-  const bbWidth = bollinger?.width ?? bb_width ?? null;
+  // Helper to get latest value (handles both scalar and series array)
+  const getLatest = (val) => {
+    if (Array.isArray(val) && val.length > 0) {
+      return val[val.length - 1]?.value ?? val[val.length - 1] ?? null;
+    }
+    return val ?? null;
+  };
+
+  const macdLine = getLatest(macd?.line) ?? getLatest(macd_line) ?? null;
+  const macdSignal = getLatest(macd?.signal) ?? getLatest(macd_signal) ?? null;
+  const macdHistogram = getLatest(macd?.histogram) ?? getLatest(macd_histogram) ?? null;
+  const emaShort = getLatest(ema?.ema9) ?? getLatest(ema_short) ?? null;
+  const emaLong = getLatest(ema?.ema21) ?? getLatest(ema_long) ?? null;
+  const ema200 = getLatest(ema?.ema200) ?? getLatest(ema_200) ?? null;
+  const bbUpper = getLatest(bollinger?.upper) ?? getLatest(bb_upper) ?? null;
+  const bbMiddle = getLatest(bollinger?.middle) ?? getLatest(bb_middle) ?? null;
+  const bbLower = getLatest(bollinger?.lower) ?? getLatest(bb_lower) ?? null;
+  const bbWidth = getLatest(bollinger?.width) ?? getLatest(bb_width) ?? null;
 
   const formatNumber = (val, decimals = 2) => {
     if (val === null || val === undefined || isNaN(val)) return '—';
@@ -77,7 +85,8 @@ const IndicatorPanel = ({ indicators }) => {
     return { label: 'Neutral', color: 'text-gray-400' };
   };
 
-  const rsiStatus = getRSIStatus(rsi);
+  const rsiValue = getLatest(rsi);
+  const rsiStatus = getRSIStatus(rsiValue);
   const macdStatus = getMACDStatus(macdLine, macdSignal);
   const bbStatus = getBBStatus(bbWidth);
   const emaTrend = getEMATrend(emaShort, emaLong);
@@ -105,7 +114,7 @@ const IndicatorPanel = ({ indicators }) => {
           </div>
           <div className="flex items-end gap-2">
             <span className={`text-2xl font-bold ${rsiStatus.color}`}>
-              {formatNumber(rsi, 1)}
+              {formatNumber(rsiValue, 1)}
             </span>
             <span className="text-sm text-gray-500 mb-1">/ 100</span>
           </div>
@@ -113,9 +122,9 @@ const IndicatorPanel = ({ indicators }) => {
           <div className="mt-3 h-2 bg-gray-700 rounded-full overflow-hidden">
             <div 
               className={`h-full rounded-full ${
-                rsi >= 70 ? 'bg-red-500' : rsi <= 30 ? 'bg-green-500' : 'bg-blue-500'
+                rsiValue >= 70 ? 'bg-red-500' : rsiValue <= 30 ? 'bg-green-500' : 'bg-blue-500'
               }`}
-              style={{ width: `${rsi || 0}%` }}
+              style={{ width: `${rsiValue || 0}%` }}
             />
           </div>
           <div className="flex justify-between text-xs text-gray-500 mt-1">

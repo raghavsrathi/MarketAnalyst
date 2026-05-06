@@ -391,7 +391,27 @@ class AnalysisService {
       ? ((lastData.bbUpper - lastData.bbLower) / lastData.bbMiddle * 100)
       : 0;
 
-    // Build nested indicators object
+    // Helper: Extract time-series for an indicator
+    const extractTimeSeries = (indicatorKey, data) => {
+      return data
+        .filter(d => d[indicatorKey] !== null && d[indicatorKey] !== undefined)
+        .map(d => ({
+          time: d.Date || d.time || Math.floor(new Date(d.date).getTime() / 1000),
+          value: parseFloat(d[indicatorKey].toFixed(2))
+        }))
+        .sort((a, b) => a.time - b.time);
+    };
+
+    // Build time-series for chart rendering
+    const timeSeries = {
+      ema_short: extractTimeSeries('ema9', data),
+      ema_long: extractTimeSeries('ema21', data),
+      bb_upper: extractTimeSeries('bbUpper', data),
+      bb_middle: extractTimeSeries('bbMiddle', data),
+      bb_lower: extractTimeSeries('bbLower', data)
+    };
+
+    // Build nested indicators object (scalar values for UI components)
     const indicators = {
       rsi: lastData.rsi !== null ? parseFloat(lastData.rsi.toFixed(2)) : null,
       macd: {
@@ -419,6 +439,7 @@ class AnalysisService {
       change: parseFloat(((lastData.Close - prevData.Close) / prevData.Close * 100).toFixed(2)),
       volume: lastData.Volume,
       indicators,
+      timeSeries,
       trend: {
         direction: trend.direction,
         strength: trend.strength,

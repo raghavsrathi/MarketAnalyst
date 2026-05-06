@@ -130,7 +130,33 @@ export async function fetchAnalysis(symbol, interval = '1d') {
   }
 
   const backendData = apiData;
-  const indicatorSummary = !Array.isArray(backendData.indicators) ? backendData.indicators : null;
+  const normalizedCandles = normaliseApiArray(backendData.candles);
+  const lastCandle = normalizedCandles[normalizedCandles.length - 1];
+  const referenceTime = lastCandle?.time ?? lastCandle?.Date ?? lastCandle?.date ?? null;
+  
+  // Build series from backend timeSeries (if available) or scalar values
+  const buildSeries = (value) => {
+    if (value === null || value === undefined || referenceTime === null) return [];
+    return [{ time: referenceTime, value }];
+  };
+
+  // Priority: use backend timeSeries if available, otherwise fall back to scalar-built arrays
+  const backendTimeSeries = backendData.timeSeries || {};
+  const emaShortSeries = Array.isArray(backendTimeSeries.ema_short) && backendTimeSeries.ema_short.length > 0
+    ? backendTimeSeries.ema_short
+    : buildSeries(backendData.ema?.ema9 ?? backendData.ema9 ?? null);
+  const emaLongSeries = Array.isArray(backendTimeSeries.ema_long) && backendTimeSeries.ema_long.length > 0
+    ? backendTimeSeries.ema_long
+    : buildSeries(backendData.ema?.ema21 ?? backendData.ema21 ?? null);
+  const bbUpperSeries = Array.isArray(backendTimeSeries.bb_upper) && backendTimeSeries.bb_upper.length > 0
+    ? backendTimeSeries.bb_upper
+    : buildSeries(backendData.bollinger?.upper ?? backendData.bollingerUpper ?? null);
+  const bbMiddleSeries = Array.isArray(backendTimeSeries.bb_middle) && backendTimeSeries.bb_middle.length > 0
+    ? backendTimeSeries.bb_middle
+    : buildSeries(backendData.bollinger?.middle ?? backendData.bollingerMiddle ?? null);
+  const bbLowerSeries = Array.isArray(backendTimeSeries.bb_lower) && backendTimeSeries.bb_lower.length > 0
+    ? backendTimeSeries.bb_lower
+    : buildSeries(backendData.bollinger?.lower ?? backendData.bollingerLower ?? null);
 
   const transformedData = {
     ...backendData,
@@ -161,7 +187,12 @@ export async function fetchAnalysis(symbol, interval = '1d') {
       lower: backendData.bollingerLower ?? backendData.indicators?.bb_lower ?? null,
       width: backendData.bollingerWidth ?? backendData.indicators?.bb_width ?? null
     },
-    indicators: indicatorSummary ?? {
+    indicators: {
+      ema_short: emaShortSeries,
+      ema_long: emaLongSeries,
+      bb_upper: bbUpperSeries,
+      bb_middle: bbMiddleSeries,
+      bb_lower: bbLowerSeries,
       rsi: backendData.rsi ?? backendData.indicators?.rsi14 ?? backendData.indicators?.rsi ?? null,
       macd: backendData.macd ?? {
         line: backendData.macd_line ?? backendData.indicators?.macd_line ?? null,
@@ -187,7 +218,7 @@ export async function fetchAnalysis(symbol, interval = '1d') {
     signal_breakdown: backendData.signal?.reasons ||
       [backendData.trend?.direction, `RSI: ${backendData.rsi ?? backendData.indicators?.rsi14}`].filter(Boolean),
     summary: backendData.signal?.reasons?.[0] || `${backendData.trend?.direction || 'Neutral'} trend detected`,
-    candles: normaliseApiArray(backendData.candles),
+    candles: normalizedCandles,
     series: normaliseApiArray(backendData.series),
   };
 

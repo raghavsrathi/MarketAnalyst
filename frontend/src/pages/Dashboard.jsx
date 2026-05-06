@@ -189,7 +189,7 @@ const Dashboard = () => {
             <div className="lg:col-span-2 space-y-6">
               <ChartComponent
                 candles={data.candles}
-                indicators={data.series}
+                indicators={data.indicators}
                 support={data.support}
                 resistance={data.resistance}
                 trend={data.trend}
