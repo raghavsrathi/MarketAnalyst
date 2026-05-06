@@ -157,6 +157,15 @@ export async function fetchAnalysis(symbol, interval = '1d') {
   const bbLowerSeries = Array.isArray(backendTimeSeries.bb_lower) && backendTimeSeries.bb_lower.length > 0
     ? backendTimeSeries.bb_lower
     : buildSeries(backendData.bollinger?.lower ?? backendData.bollingerLower ?? null);
+  const macdLineSeries = Array.isArray(backendTimeSeries.macd_line) && backendTimeSeries.macd_line.length > 0
+    ? backendTimeSeries.macd_line
+    : buildSeries(backendData.macd?.line ?? backendData.macd_line ?? null);
+  const macdSignalSeries = Array.isArray(backendTimeSeries.macd_signal) && backendTimeSeries.macd_signal.length > 0
+    ? backendTimeSeries.macd_signal
+    : buildSeries(backendData.macd?.signal ?? backendData.macd_signal ?? null);
+  const macdHistogramSeries = Array.isArray(backendTimeSeries.macd_histogram) && backendTimeSeries.macd_histogram.length > 0
+    ? backendTimeSeries.macd_histogram
+    : buildSeries(backendData.macd?.histogram ?? backendData.macd_histogram ?? null);
 
   const transformedData = {
     ...backendData,
@@ -193,6 +202,9 @@ export async function fetchAnalysis(symbol, interval = '1d') {
       bb_upper: bbUpperSeries,
       bb_middle: bbMiddleSeries,
       bb_lower: bbLowerSeries,
+      macd_line: macdLineSeries,
+      macd_signal: macdSignalSeries,
+      macd_histogram: macdHistogramSeries,
       rsi: backendData.rsi ?? backendData.indicators?.rsi14 ?? backendData.indicators?.rsi ?? null,
       macd: backendData.macd ?? {
         line: backendData.macd_line ?? backendData.indicators?.macd_line ?? null,

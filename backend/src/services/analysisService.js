@@ -408,7 +408,10 @@ class AnalysisService {
       ema_long: extractTimeSeries('ema21', data),
       bb_upper: extractTimeSeries('bbUpper', data),
       bb_middle: extractTimeSeries('bbMiddle', data),
-      bb_lower: extractTimeSeries('bbLower', data)
+      bb_lower: extractTimeSeries('bbLower', data),
+      macd_line: extractTimeSeries('macd', data),
+      macd_signal: extractTimeSeries('macdSignal', data),
+      macd_histogram: extractTimeSeries('macdHistogram', data)
     };
 
     // Build nested indicators object (scalar values for UI components)

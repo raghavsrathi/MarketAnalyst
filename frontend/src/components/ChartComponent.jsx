@@ -92,19 +92,23 @@ const ChartComponent = ({
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef({});
+  const macdContainerRef = useRef(null);
+  const macdChartRef = useRef(null);
+  const macdSeriesRef = useRef({});
   const [showEMA, setShowEMA] = useState(true);
   const [showBB, setShowBB] = useState(true);
+  const [showMACD, setShowMACD] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Initialize chart
+  // Initialize charts
   useEffect(() => {
-  if (!chartContainerRef.current) return;
+  if (!chartContainerRef.current || !macdContainerRef.current) return;
 
   // FIX: Reset seriesRef at the start of every mount.
-  // StrictMode mounts twice; without this, the second mount's data effect
-  // reads stale series references from the first (already destroyed) chart.
   seriesRef.current = {};
+  macdSeriesRef.current = {};
 
+  // Main chart options
   const chartOptions = {
     layout: {
       background: { type: ColorType.Solid, color: '#1a1a1a' },
@@ -137,6 +141,34 @@ const ChartComponent = ({
 
   const chart = createChart(chartContainerRef.current, chartOptions);
   chartRef.current = chart;
+
+  // MACD chart options
+  const macdChartOptions = {
+    layout: {
+      background: { type: ColorType.Solid, color: '#1a1a1a' },
+      textColor: '#d1d5db',
+    },
+    grid: {
+      vertLines: { color: '#374151', style: 1 },
+      horzLines: { color: '#374151', style: 1 },
+    },
+    rightPriceScale: {
+      borderColor: '#4b5563',
+      scaleMargins: { top: 0.1, bottom: 0.1 },
+    },
+    timeScale: {
+      borderColor: '#4b5563',
+      timeVisible: true,
+      secondsVisible: false,
+      visible: false, // Hide time scale on MACD chart (synced with main)
+    },
+    handleScroll: { vertTouchDrag: false },
+    width: macdContainerRef.current.clientWidth,
+    height: 120,
+  };
+
+  const macdChart = createChart(macdContainerRef.current, macdChartOptions);
+  macdChartRef.current = macdChart;
 
   const candlestickSeries = chart.addCandlestickSeries({
       upColor: '#22c55e',
@@ -189,7 +221,6 @@ const ChartComponent = ({
     });
     seriesRef.current.bbLower = bbLowerSeries;
 
-
     // Support/Resistance lines
     const supportSeries = chart.addLineSeries({
       color: '#22c55e',
@@ -207,6 +238,34 @@ const ChartComponent = ({
     });
     seriesRef.current.resistance = resistanceSeries;
 
+  // Create MACD series
+  const macdLineSeries = macdChart.addLineSeries({
+    color: '#f59e0b',
+    lineWidth: 2,
+    title: 'MACD Line',
+  });
+  macdSeriesRef.current.macdLine = macdLineSeries;
+
+  const macdSignalSeries = macdChart.addLineSeries({
+    color: '#3b82f6',
+    lineWidth: 2,
+    title: 'MACD Signal',
+  });
+  macdSeriesRef.current.macdSignal = macdSignalSeries;
+
+  const macdHistogramSeries = macdChart.addHistogramSeries({
+    color: '#22c55e',
+    title: 'MACD Histogram',
+  });
+  macdSeriesRef.current.macdHistogram = macdHistogramSeries;
+
+  // Sync time scales between charts
+  chart.timeScale().subscribeVisibleTimeRangeChange((timeRange) => {
+    if (timeRange && macdChartRef.current) {
+      macdChartRef.current.timeScale().setVisibleLogicalRange(chart.timeScale().getVisibleLogicalRange());
+    }
+  });
+
   const resizeObserver = new ResizeObserver((entries) => {
     requestAnimationFrame(() => {
       if (!chartRef.current || !entries[0]) return;
@@ -221,6 +280,7 @@ const ChartComponent = ({
   });
 
   resizeObserver.observe(chartContainerRef.current);
+  resizeObserver.observe(macdContainerRef.current);
 
   // FIX: Initial size also needs RAF for the same reason
   requestAnimationFrame(() => {
@@ -232,15 +292,22 @@ const ChartComponent = ({
         height: clientHeight,
       });
     }
+    if (macdChartRef.current && macdContainerRef.current) {
+      const { clientWidth: macdWidth } = macdContainerRef.current;
+      if (macdWidth > 0) {
+        macdChartRef.current.applyOptions({ width: macdWidth });
+      }
+    }
   });
 
   return () => {
     resizeObserver.disconnect();
     chart.remove();
-    // FIX: Explicitly null out refs on cleanup so the data effect
-    // guard `if (!chartRef.current)` correctly blocks stale calls.
+    macdChart.remove();
     chartRef.current = null;
+    macdChartRef.current = null;
     seriesRef.current = {};
+    macdSeriesRef.current = {};
   };
 }, []);
 
@@ -354,9 +421,41 @@ const ChartComponent = ({
       ]);
     }
 
+    // Set MACD data on separate chart
+    if (macdChartRef.current) {
+      const macdLineSource = Array.isArray(indicators?.macd_line)
+        ? indicators.macd_line
+        : buildPointSeries(indicators?.macd?.line ?? indicators?.macd_line);
+      const macdSignalSource = Array.isArray(indicators?.macd_signal)
+        ? indicators.macd_signal
+        : buildPointSeries(indicators?.macd?.signal ?? indicators?.macd_signal);
+      const macdHistogramSource = Array.isArray(indicators?.macd_histogram)
+        ? indicators.macd_histogram
+        : buildPointSeries(indicators?.macd?.histogram ?? indicators?.macd_histogram);
+
+      const macdLineData = convertIndicatorData(macdLineSource);
+      const macdSignalData = convertIndicatorData(macdSignalSource);
+      const macdHistogramData = convertIndicatorData(macdHistogramSource);
+
+      if (macdLineData.length > 0 && macdSeriesRef.current.macdLine) {
+        macdSeriesRef.current.macdLine.setData(macdLineData);
+        macdSeriesRef.current.macdLine.applyOptions({ visible: showMACD });
+      }
+      if (macdSignalData.length > 0 && macdSeriesRef.current.macdSignal) {
+        macdSeriesRef.current.macdSignal.setData(macdSignalData);
+        macdSeriesRef.current.macdSignal.applyOptions({ visible: showMACD });
+      }
+      if (macdHistogramData.length > 0 && macdSeriesRef.current.macdHistogram) {
+        macdSeriesRef.current.macdHistogram.setData(macdHistogramData);
+        macdSeriesRef.current.macdHistogram.applyOptions({ visible: showMACD });
+      }
+
+      macdChartRef.current.timeScale().fitContent();
+    }
+
     // Fit content
     chartRef.current.timeScale().fitContent();
-  }, [candles, indicators, support, resistance, showEMA, showBB]);
+  }, [candles, indicators, support, resistance, showEMA, showBB, showMACD]);
 
   const toggleFullscreen = () => {
   setIsFullscreen(prev => !prev);
@@ -366,6 +465,11 @@ const ChartComponent = ({
       chartRef.current.applyOptions({
         width: chartContainerRef.current.clientWidth,
         height: chartContainerRef.current.clientHeight,
+      });
+    }
+    if (macdChartRef.current && macdContainerRef.current) {
+      macdChartRef.current.applyOptions({
+        width: macdContainerRef.current.clientWidth,
       });
     }
   });
@@ -413,6 +517,15 @@ const ChartComponent = ({
               <span className="w-2 h-2 rounded-full bg-purple-500"></span>
               BB
             </button>
+            <button
+              onClick={() => setShowMACD(!showMACD)}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                showMACD ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+              MACD
+            </button>
           </div>
 
           {/* Legend */}
@@ -425,6 +538,9 @@ const ChartComponent = ({
             </span>
             <span className="flex items-center gap-1">
               <span className="w-2 h-0.5 bg-purple-500"></span> BB
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-0.5 bg-orange-500"></span> MACD
             </span>
             {support && (
               <span className="flex items-center gap-1">
@@ -458,15 +574,27 @@ const ChartComponent = ({
         </div>
       )}
 
-      {/* Chart Container */}
-      <div 
-        ref={chartContainerRef} 
-        className="w-full"
-        style={{ 
-          height: isFullscreen ? 'calc(100% - 60px)' : '440px',
-          minHeight: '440px',
-        }}
-      />
+      {/* Chart Containers */}
+      <div className="flex flex-col gap-1">
+        {/* Main Price Chart */}
+        <div 
+          ref={chartContainerRef} 
+          className="w-full"
+          style={{ 
+            height: isFullscreen ? 'calc(100% - 180px)' : '320px',
+            minHeight: '320px',
+          }}
+        />
+        {/* MACD Chart */}
+        <div
+          ref={macdContainerRef}
+          className="w-full border-t border-gray-700"
+          style={{
+            height: '120px',
+            minHeight: '120px',
+          }}
+        />
+      </div>
     </div>
   );
 };
