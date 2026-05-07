@@ -126,6 +126,7 @@ const ChartComponent = ({
     rightPriceScale: {
       borderColor: '#4b5563',
       scaleMargins: { top: 0.1, bottom: 0.1 },
+      minimumValue: 0,
     },
     timeScale: {
       borderColor: '#4b5563',

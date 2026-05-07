@@ -56,6 +56,7 @@ router.get('/auth/profile', apiLimiter, authController.getProfile);
 
 // ==================== STOCKS ROUTES ====================
 router.get('/stocks', apiLimiter, stocksController.getAllStocks);
+router.get('/stocks/nse', apiLimiter, stocksController.getAllNSEStocks);
 router.get('/stocks/popular', apiLimiter, stocksController.getPopularStocks);
 router.get('/stocks/:symbol', apiLimiter, stocksController.getStockBySymbol);
 router.post('/stocks/sync', syncLimiter, stocksController.syncInstruments);

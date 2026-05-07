@@ -7,20 +7,48 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Clock, ChevronDown, TrendingUp, Bitcoin, Star, Globe } from 'lucide-react';
-import { INTERVALS, POPULAR_SYMBOLS } from '../services/api';
+import { INTERVALS, POPULAR_SYMBOLS, fetchNSEStocks } from '../services/api';
 
 const SearchBar = ({ symbol, interval, onSymbolChange, onIntervalChange, onAnalyze, isLoading }) => {
   const [inputValue, setInputValue] = useState(symbol);
   const [showSymbolDropdown, setShowSymbolDropdown] = useState(false);
   const [showIntervalDropdown, setShowIntervalDropdown] = useState(false);
+  const [allSymbols, setAllSymbols] = useState(POPULAR_SYMBOLS);
   const [filteredSymbols, setFilteredSymbols] = useState(POPULAR_SYMBOLS);
+  const [isLoadingSymbols, setIsLoadingSymbols] = useState(false);
   const symbolDropdownRef = useRef(null);
   const intervalDropdownRef = useRef(null);
+  const hasFetchedSymbols = useRef(false);
 
   // Update input when symbol prop changes
   useEffect(() => {
     setInputValue(symbol);
   }, [symbol]);
+
+  // Fetch all NSE stocks when dropdown opens
+  useEffect(() => {
+    if (showSymbolDropdown && !hasFetchedSymbols.current) {
+      setIsLoadingSymbols(true);
+      fetchNSEStocks()
+        .then(stocks => {
+          // Sort alphabetically by symbol
+          const sorted = stocks.sort((a, b) => a.symbol.localeCompare(b.symbol));
+          setAllSymbols(sorted);
+          setFilteredSymbols(sorted);
+          hasFetchedSymbols.current = true;
+        })
+        .catch(error => {
+          console.error('Failed to fetch NSE stocks:', error);
+          // Fallback to hardcoded list
+          const indianStocks = POPULAR_SYMBOLS.filter(s => s.category === 'Indian Stock');
+          setAllSymbols(indianStocks);
+          setFilteredSymbols(indianStocks);
+        })
+        .finally(() => {
+          setIsLoadingSymbols(false);
+        });
+    }
+  }, [showSymbolDropdown]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -39,13 +67,21 @@ const SearchBar = ({ symbol, interval, onSymbolChange, onIntervalChange, onAnaly
 
   // Filter symbols based on input
   useEffect(() => {
-    const filtered = POPULAR_SYMBOLS.filter(
-      s => 
-        s.symbol.toLowerCase().includes(inputValue.toLowerCase()) ||
-        s.name.toLowerCase().includes(inputValue.toLowerCase())
-    );
-    setFilteredSymbols(filtered);
-  }, [inputValue]);
+    const trimmedInput = inputValue.trim().toLowerCase();
+    if (!trimmedInput) {
+      // Show all Indian stocks
+      const indianStocks = allSymbols.filter(s => s.category === 'Indian Stock');
+      setFilteredSymbols(indianStocks);
+    } else {
+      // Filter based on input
+      const filtered = allSymbols.filter(
+        s => 
+          s.symbol.toLowerCase().includes(trimmedInput) ||
+          s.name.toLowerCase().includes(trimmedInput)
+      );
+      setFilteredSymbols(filtered);
+    }
+  }, [inputValue, allSymbols]);
 
   const handleInputChange = (e) => {
     setInputValue(e.target.value);
@@ -114,12 +150,18 @@ const SearchBar = ({ symbol, interval, onSymbolChange, onIntervalChange, onAnaly
           {/* Symbol Dropdown */}
           {showSymbolDropdown && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-gray-800 border border-gray-700 
-                            rounded-lg shadow-xl max-h-80 overflow-y-auto z-50">
-              <div className="p-2 text-xs text-gray-500 uppercase font-semibold tracking-wider">
-                Popular Symbols
+                            rounded-lg shadow-xl max-h-[60vh] overflow-y-auto z-50">
+              <div className="p-2 text-xs text-gray-500 uppercase font-semibold tracking-wider flex justify-between">
+                <span>NSE Stocks</span>
+                <span>{filteredSymbols.length.toLocaleString()} stocks</span>
               </div>
-              {filteredSymbols.length > 0 ? (
-                filteredSymbols.map((item) => (
+              {isLoadingSymbols ? (
+                <div className="px-3 py-4 text-gray-500 text-center">
+                  <div className="w-4 h-4 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-2" />
+                  Loading all NSE stocks...
+                </div>
+              ) : filteredSymbols.length > 0 ? (
+                filteredSymbols.slice(0, 100).map((item) => (
                   <button
                     key={item.symbol}
                     type="button"
@@ -141,7 +183,12 @@ const SearchBar = ({ symbol, interval, onSymbolChange, onIntervalChange, onAnaly
                 ))
               ) : (
                 <div className="px-3 py-4 text-gray-500 text-center">
-                  Press Enter to search for "{inputValue}"
+                  No stocks found matching "{inputValue}"
+                </div>
+              )}
+              {filteredSymbols.length > 100 && (
+                <div className="p-2 text-xs text-gray-500 text-center border-t border-gray-700">
+                  +{filteredSymbols.length - 100} more results. Type to filter...
                 </div>
               )}
             </div>

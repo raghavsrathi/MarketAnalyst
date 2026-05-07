@@ -151,6 +151,42 @@ exports.syncInstruments = async (req, res) => {
 };
 
 /**
+ * Get all NSE stocks from Upstox (real-time master contract)
+ * GET /stocks/nse
+ */
+exports.getAllNSEStocks = async (req, res) => {
+  try {
+    logger.info('[Stocks] Fetching all NSE stocks from Upstox');
+    const instruments = await upstoxService.fetchInstruments('NSE');
+    
+    // Filter only equity stocks (not futures, options, etc.)
+    const stocks = instruments
+      .filter(inst => inst.instrument_type === 'EQ')
+      .map(inst => ({
+        symbol: inst.tradingsymbol + '.NS',
+        name: inst.name || inst.tradingsymbol,
+        exchange: 'NSE',
+        category: 'Indian Stock',
+        tradingsymbol: inst.tradingsymbol,
+        instrument_key: inst.instrument_key
+      }));
+    
+    logger.info(`[Stocks] Returning ${stocks.length} NSE stocks`);
+    res.json({
+      success: true,
+      data: stocks,
+      count: stocks.length
+    });
+  } catch (error) {
+    logger.error('Failed to fetch NSE stocks from Upstox:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+/**
  * Get popular stocks (hardcoded list)
  * GET /stocks/popular
  */

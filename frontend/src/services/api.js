@@ -9,6 +9,27 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 /**
+ * Fetch all NSE stocks from Upstox
+ * @returns {Promise<Array>} Array of all NSE stocks
+ */
+export async function fetchNSEStocks() {
+  const url = `${API_BASE_URL}/stocks/nse`;
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to fetch NSE stocks: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to fetch NSE stocks');
+  }
+
+  return result.data || [];
+}
+
+/**
  * NORMALISATION UTILITY
  * ---------------------
  * Maps PascalCase API keys to camelCase at the data-fetch boundary.
@@ -70,7 +91,7 @@ export const INTERVALS = [
  * Popular symbols for quick selection
  */
 export const POPULAR_SYMBOLS = [
-  // Indian Stocks (NSE)
+  // Indian Stocks (NSE) - Top 50
   { symbol: 'RELIANCE.NS', name: 'Reliance Industries', category: 'Indian Stock' },
   { symbol: 'TCS.NS', name: 'Tata Consultancy Services', category: 'Indian Stock' },
   { symbol: 'INFY.NS', name: 'Infosys Ltd', category: 'Indian Stock' },
@@ -86,6 +107,42 @@ export const POPULAR_SYMBOLS = [
   { symbol: 'AXISBANK.NS', name: 'Axis Bank', category: 'Indian Stock' },
   { symbol: 'MARUTI.NS', name: 'Maruti Suzuki', category: 'Indian Stock' },
   { symbol: 'TATAMOTORS.NS', name: 'Tata Motors', category: 'Indian Stock' },
+  { symbol: 'SUNPHARMA.NS', name: 'Sun Pharmaceutical', category: 'Indian Stock' },
+  { symbol: 'BAJAJFINSV.NS', name: 'Bajaj Finserv', category: 'Indian Stock' },
+  { symbol: 'ADANIENT.NS', name: 'Adani Enterprises', category: 'Indian Stock' },
+  { symbol: 'ADANIPORTS.NS', name: 'Adani Ports', category: 'Indian Stock' },
+  { symbol: 'COALINDIA.NS', name: 'Coal India', category: 'Indian Stock' },
+  { symbol: 'POWERGRID.NS', name: 'Power Grid Corp', category: 'Indian Stock' },
+  { symbol: 'NTPC.NS', name: 'NTPC Ltd', category: 'Indian Stock' },
+  { symbol: 'ONGC.NS', name: 'Oil & Natural Gas Corp', category: 'Indian Stock' },
+  { symbol: 'HCLTECH.NS', name: 'HCL Technologies', category: 'Indian Stock' },
+  { symbol: 'WIPRO.NS', name: 'Wipro Ltd', category: 'Indian Stock' },
+  { symbol: 'TECHM.NS', name: 'Tech Mahindra', category: 'Indian Stock' },
+  { symbol: 'ASIANPAINT.NS', name: 'Asian Paints', category: 'Indian Stock' },
+  { symbol: 'NESTLEIND.NS', name: 'Nestle India', category: 'Indian Stock' },
+  { symbol: 'ULTRACEMCO.NS', name: 'UltraTech Cement', category: 'Indian Stock' },
+  { symbol: 'TITAN.NS', name: 'Titan Company', category: 'Indian Stock' },
+  { symbol: 'M&M.NS', name: 'Mahindra & Mahindra', category: 'Indian Stock' },
+  { symbol: 'GRASIM.NS', name: 'Grasim Industries', category: 'Indian Stock' },
+  { symbol: 'CIPLA.NS', name: 'Cipla Ltd', category: 'Indian Stock' },
+  { symbol: 'DRREDDY.NS', name: 'Dr Reddy Labs', category: 'Indian Stock' },
+  { symbol: 'EICHERMOT.NS', name: 'Eicher Motors', category: 'Indian Stock' },
+  { symbol: 'JSWSTEEL.NS', name: 'JSW Steel', category: 'Indian Stock' },
+  { symbol: 'TATASTEEL.NS', name: 'Tata Steel', category: 'Indian Stock' },
+  { symbol: 'HDFCLIFE.NS', name: 'HDFC Life Insurance', category: 'Indian Stock' },
+  { symbol: 'SBILIFE.NS', name: 'SBI Life Insurance', category: 'Indian Stock' },
+  { symbol: 'BAJAJAUTO.NS', name: 'Bajaj Auto', category: 'Indian Stock' },
+  { symbol: 'TATACONSUM.NS', name: 'Tata Consumer', category: 'Indian Stock' },
+  { symbol: 'DIVISLAB.NS', name: 'Divis Laboratories', category: 'Indian Stock' },
+  { symbol: 'BRITANNIA.NS', name: 'Britannia Industries', category: 'Indian Stock' },
+  { symbol: 'APOLLOHOSP.NS', name: 'Apollo Hospitals', category: 'Indian Stock' },
+  { symbol: 'ADANIGREEN.NS', name: 'Adani Green Energy', category: 'Indian Stock' },
+  { symbol: 'ADANIPOWER.NS', name: 'Adani Power', category: 'Indian Stock' },
+  { symbol: 'VEDL.NS', name: 'Vedanta Ltd', category: 'Indian Stock' },
+  { symbol: 'INDUSINDBK.NS', name: 'IndusInd Bank', category: 'Indian Stock' },
+  { symbol: 'UPL.NS', name: 'UPL Ltd', category: 'Indian Stock' },
+  { symbol: 'PIDILITIND.NS', name: 'Pidilite Industries', category: 'Indian Stock' },
+  { symbol: 'SIEMENS.NS', name: 'Siemens India', category: 'Indian Stock' },
 ];
 
 /**

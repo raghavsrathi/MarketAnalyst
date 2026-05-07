@@ -161,15 +161,17 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Search Bar */}
-        <SearchBar
-          symbol={symbol}
-          interval={interval}
-          onSymbolChange={setSymbol}
-          onIntervalChange={setInterval}
-          onAnalyze={handleAnalyze}
-          isLoading={loading}
-        />
+        {/* Search Bar - z-50 ensures dropdown appears above chart */}
+        <div className="relative z-50">
+          <SearchBar
+            symbol={symbol}
+            interval={interval}
+            onSymbolChange={setSymbol}
+            onIntervalChange={setInterval}
+            onAnalyze={handleAnalyze}
+            isLoading={loading}
+          />
+        </div>
 
         {/* Loading State */}
         {loading && <LoadingState />}
